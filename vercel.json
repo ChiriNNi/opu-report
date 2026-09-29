@@ -1,0 +1,8 @@
+{
+  "functions": {
+    "api/data.py": {
+      "includeFiles": "{build_data.py,ds_api.py,plan_daily.json}",
+      "maxDuration": 60
+    }
+  }
+}

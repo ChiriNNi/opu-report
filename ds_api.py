@@ -2,7 +2,7 @@
 """Клиент API Dream Square. Ключи берутся из окружения — в репозиторий они не попадают.
 
 Локально:  DS_CLIENT_ID=... DS_CLIENT_SECRET=... python build_data.py
-В Actions: те же значения лежат в Secrets репозитория.
+На Vercel: те же значения лежат в Environment Variables проекта.
 """
 import json, os, urllib.request, urllib.parse
 
@@ -22,6 +22,11 @@ def token():
             headers={'Content-Type': 'application/json'})
         _tok[0] = json.loads(urllib.request.urlopen(r, timeout=30).read().decode())['accessToken']
     return _tok[0]
+
+
+def reset_token():
+    """Сбросить кэш токена: тёплый экземпляр функции Vercel живёт дольше, чем токен."""
+    _tok[0] = None
 
 
 def attendance(frm, to, **extra):

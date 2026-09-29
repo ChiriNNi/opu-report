@@ -87,19 +87,32 @@ const nf = n => (n === null || n === undefined) ? '' : n.toLocaleString('ru-RU')
 const dmy = s => s.slice(8,10)+'.'+s.slice(5,7);
 const past = d => D.have.includes(d);
 
+async function getJSON(url){
+  const r = await fetch(url + '?ts=' + Date.now(), {cache:'no-store'});
+  const j = await r.json().catch(() => null);
+  if(!r.ok || !j || j.error) throw new Error((j && j.error) || 'HTTP ' + r.status);
+  return j;
+}
+
 async function load(){
   const btn = document.getElementById('upd'), stamp = document.getElementById('stamp');
   btn.classList.add('busy'); btn.disabled = true; stamp.className = 'stamp'; stamp.textContent = 'обновляю…';
   try{
-    const r = await fetch('data.json?ts=' + Date.now(), {cache:'no-store'});
-    if(!r.ok) throw new Error('HTTP ' + r.status);
-    D = await r.json();
-    head(); kpis(); render();
+    // живые данные: функция Vercel api/data.py сама ходит в API Dream Square
+    D = await getJSON('api/data');
     stamp.textContent = 'данные на ' + D.gen;
   }catch(e){
-    stamp.className = 'stamp err';
-    stamp.textContent = 'не удалось загрузить data.json (' + e.message + ')';
+    // API недоступен — оставляем то, что уже на экране, или берём сохранённый data.json
+    try{
+      if(!D) D = await getJSON('data.json');
+      stamp.className = 'stamp err';
+      stamp.textContent = 'API недоступен (' + e.message + '), показаны данные на ' + D.gen;
+    }catch(e2){
+      stamp.className = 'stamp err';
+      stamp.textContent = 'не удалось загрузить данные (' + e.message + ')';
+    }
   }finally{
+    if(D){ head(); kpis(); render(); }
     btn.classList.remove('busy'); btn.disabled = false;
   }
 }
