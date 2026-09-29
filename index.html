@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>План / факт ОПУ по дням</title>
+<style>
+:root{
+  --bg:#f6f7f9; --card:#fff; --ink:#16202c; --muted:#6b7785; --line:#dfe4ea;
+  --accent:#1f4e78; --accent2:#2e75b6; --plan:#dde9f5; --fact:#e2efda;
+  --bad:#fce8e9; --badink:#9c0006; --good:#2e7d32;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:13px/1.4 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
+.wrap{max-width:100%;margin:0 auto;padding:20px 18px 50px}
+h1{font-size:20px;margin:0 0 3px}
+div.sub{color:var(--muted);font-size:12.5px;margin-bottom:16px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:12px 14px}
+.kpi .l{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.kpi .v{font-size:23px;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums}
+.kpi .n{font-size:11.5px;color:var(--muted);margin-top:2px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.phead{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;
+  padding:11px 14px;border-bottom:1px solid var(--line)}
+.phead h2{font-size:14px;margin:0}
+.ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+input[type=search]{border:1px solid var(--line);border-radius:7px;padding:5px 9px;font:inherit;min-width:175px}
+label.chk{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:12.5px;cursor:pointer}
+button.up{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:7px;
+  padding:6px 14px;font:inherit;font-weight:600;cursor:pointer;display:flex;gap:7px;align-items:center}
+button.up:hover{background:#17405f}
+button.up:disabled{opacity:.6;cursor:default}
+button.up .sp{width:12px;height:12px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;
+  border-radius:50%;display:none}
+button.up.busy .sp{display:inline-block;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.stamp{color:var(--muted);font-size:12px}
+.stamp.err{color:var(--badink)}
+.scroll{overflow-x:auto}
+table{border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums}
+th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+thead th{background:var(--accent);color:#fff;font-weight:600;font-size:11.5px;position:sticky;z-index:3}
+thead tr:first-child th{top:0}
+thead tr:last-child th{top:25px}
+th.day{background:var(--accent2);text-align:center;border-left:2px solid #fff}
+th.lvl{color:#fff;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+th.lvl.p{background:#3a6ea5} th.lvl.f{background:#3f7d3f}
+th.nm,td.nm{text-align:left;position:sticky;left:0;background:var(--card);z-index:2;min-width:180px}
+thead th.nm{z-index:4;background:var(--accent)}
+td.p{background:var(--plan)} td.f{background:var(--fact);font-weight:600}
+td.f.na{background:#f4f6f8;color:#c3cad2}
+td.d0{border-left:2px solid #eceff2}
+tbody tr:hover td{filter:brightness(.97)}
+tr.zero td,tr.zero td.nm{background:var(--bad);color:var(--badink);font-weight:600}
+tfoot td{background:#fdf0e3;font-weight:700;border-top:2px solid var(--line)}
+tfoot td.nm{background:#fdf0e3}
+.over{color:var(--good)} .under{color:var(--badink)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:11.5px;padding:9px 14px;border-top:1px solid var(--line)}
+.sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:5px;border:1px solid var(--line)}
+@media print{body{background:#fff}.ctl{display:none}.scroll{overflow:visible}}
+</style></head><body><div class="wrap">
+<h1>План / факт ОПУ по дням</h1>
+<div class="sub" id="sub">загрузка данных…</div>
+<div class="kpis" id="kpis"></div>
+
+<div class="panel">
+  <div class="phead"><h2>Партнёры: план на день и факт отметок</h2>
+    <div class="ctl">
+      <button class="up" id="upd"><span class="sp"></span>Обновить</button>
+      <span class="stamp" id="stamp"></span>
+      <input type="search" id="q" placeholder="поиск партнёра">
+      <label class="chk"><input type="checkbox" id="onlyzero"> только нулевые</label>
+      <label class="chk"><input type="checkbox" id="onlypast" checked> последние 3 дня</label>
+    </div>
+  </div>
+  <div class="scroll"><table id="t"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
+  <div class="legend">
+    <span><i class="sw" style="background:var(--plan)"></i>план на день (нарастающим)</span>
+    <span><i class="sw" style="background:var(--fact)"></i>факт отметок за день (наведи — сколько операторов)</span>
+    <span><i class="sw" style="background:var(--bad)"></i>ни одной отметки за период</span>
+    <span>зелёным — факт ≥ плана дня</span>
+  </div>
+</div>
+<script>
+let D = null;
+const nf = n => (n === null || n === undefined) ? '' : n.toLocaleString('ru-RU');
+const dmy = s => s.slice(8,10)+'.'+s.slice(5,7);
+const past = d => D.have.includes(d);
+
+async function load(){
+  const btn = document.getElementById('upd'), stamp = document.getElementById('stamp');
+  btn.classList.add('busy'); btn.disabled = true; stamp.className = 'stamp'; stamp.textContent = 'обновляю…';
+  try{
+    const r = await fetch('data.json?ts=' + Date.now(), {cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    D = await r.json();
+    head(); kpis(); render();
+    stamp.textContent = 'данные на ' + D.gen;
+  }catch(e){
+    stamp.className = 'stamp err';
+    stamp.textContent = 'не удалось загрузить data.json (' + e.message + ')';
+  }finally{
+    btn.classList.remove('busy'); btn.disabled = false;
+  }
+}
+
+function head(){
+  document.getElementById('sub').textContent =
+    'План на день — из разбивки по партнёрам · факт — API Dream Square (Asia/Almaty) · дни ' +
+    dmy(D.days[0]) + '–' + dmy(D.days[D.days.length-1]) + ' · факт заполнен по ' +
+    dmy(D.have[D.have.length-1]) + ' · собрано ' + D.gen;
+}
+
+function kpis(){
+  const lastIdx = D.days.indexOf(D.have[D.have.length-1]);
+  const planLast = D.tot.p[lastIdx], factLast = D.tot.f[lastIdx];
+  document.getElementById('kpis').innerHTML = [
+    ['План ОПУ (месяц)', nf(D.tot.plan), D.tot.obj + ' объектов'],
+    ['План 80%', nf(Math.round(D.tot.plan80)), 'целевой уровень'],
+    ['План на ' + dmy(D.days[lastIdx]), nf(planLast), 'нарастающим итогом'],
+    ['Факт на ' + dmy(D.days[lastIdx]), nf(factLast), (planLast ? (factLast/planLast*100).toFixed(1) : 0) + '% от плана дня'],
+    ['Партнёров без отметок', D.rows.filter(r => r.zero && r.plan > 0).length, 'из ' + D.rows.filter(r => r.plan > 0).length + ' с планом'],
+  ].map(([l,v,n]) => '<div class="kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="n">'+n+'</div></div>').join('');
+}
+
+function render(){
+  if(!D) return;
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const oz = document.getElementById('onlyzero').checked;
+  const op = document.getElementById('onlypast').checked;
+  // по умолчанию — три последних дня с фактом; без галки — весь период
+  const idx = op ? D.days.map((d,i)=>i).filter(i => past(D.days[i])).slice(-3)
+                 : D.days.map((d,i)=>i);
+  const rs = D.rows.filter(r => (!q || r.name.toLowerCase().includes(q)) && (!oz || r.zero));
+
+  document.querySelector('#t thead').innerHTML =
+    '<tr><th class="nm" rowspan="2">Партнёр</th><th rowspan="2">Объектов</th><th rowspan="2">План ОПУ</th><th rowspan="2">План 80%</th>' +
+    idx.map(i => '<th class="day" colspan="2">' + D.wd[i] + ' ' + dmy(D.days[i]) + '</th>').join('') + '</tr>' +
+    '<tr>' + idx.map(() => '<th class="lvl p">План</th><th class="lvl f">Факт</th>').join('') + '</tr>';
+
+  document.querySelector('#t tbody').innerHTML = rs.map(r =>
+    '<tr class="' + (r.zero ? 'zero' : '') + '"><td class="nm">' + r.name + '</td><td>' + nf(r.obj) +
+    '</td><td>' + nf(r.plan) + '</td><td>' + nf(Math.round(r.plan80)) + '</td>' +
+    idx.map(i => {
+      const p = r.p[i], f = r.f[i];
+      const cls = (f === null) ? 'f na' : 'f ' + (p && f >= p ? 'over' : (f ? '' : 'under'));
+      const tip = (f === null) ? '' : ' title="операторов: ' + (r.o[i] || 0) + '"';
+      return '<td class="p d0">' + (p || '') + '</td><td class="' + cls + '"' + tip + '>' + (f === null ? '·' : (f || 0)) + '</td>';
+    }).join('') + '</tr>').join('');
+
+  document.querySelector('#t tfoot').innerHTML =
+    '<tr><td class="nm">ИТОГО (' + rs.length + ')</td>' +
+    '<td>' + nf(rs.reduce((a,r)=>a+r.obj,0)) + '</td><td>' + nf(rs.reduce((a,r)=>a+r.plan,0)) + '</td>' +
+    '<td>' + nf(Math.round(rs.reduce((a,r)=>a+r.plan80,0))) + '</td>' +
+    idx.map(i => {
+      const p = rs.reduce((a,r)=>a+(r.p[i]||0),0);
+      const f = past(D.days[i]) ? rs.reduce((a,r)=>a+(r.f[i]||0),0) : null;
+      return '<td class="d0">' + (p||'') + '</td><td class="' + (f===null?'na':(p&&f>=p?'over':'under')) + '">' + (f===null?'·':f) + '</td>';
+    }).join('') + '</tr>';
+}
+['q','onlyzero','onlypast'].forEach(id => document.getElementById(id).oninput = render);
+document.getElementById('upd').onclick = load;
+load();
+</script>
+</div></body></html>

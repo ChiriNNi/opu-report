@@ -1,0 +1,38 @@
+name: Обновить данные отчёта
+
+on:
+  schedule:
+    # каждые 30 минут с 04:00 до 15:00 UTC = 09:00–20:00 по Алматы
+    - cron: '*/30 4-15 * * *'
+  workflow_dispatch:        # кнопка «Run workflow» на вкладке Actions
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Собрать data.json
+        env:
+          DS_CLIENT_ID: ${{ secrets.DS_CLIENT_ID }}
+          DS_CLIENT_SECRET: ${{ secrets.DS_CLIENT_SECRET }}
+        run: python build_data.py
+
+      - name: Закоммитить, если данные изменились
+        run: |
+          git config user.name  "opu-report bot"
+          git config user.email "actions@github.com"
+          git add data.json
+          git diff --staged --quiet && echo "без изменений" && exit 0
+          git commit -m "данные на $(TZ=Asia/Almaty date '+%d.%m.%Y %H:%M')"
+          git push
