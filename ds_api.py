@@ -7,8 +7,8 @@
 import json, os, urllib.request, urllib.parse
 
 BASE = os.environ.get('DS_BASE', 'https://icg.lendo.kz')
-CLIENT_ID = os.environ.get('DS_CLIENT_ID', '')
-CLIENT_SECRET = os.environ.get('DS_CLIENT_SECRET', '')
+CLIENT_ID = os.environ.get('DS_CLIENT_ID', '').strip().strip('"')
+CLIENT_SECRET = os.environ.get('DS_CLIENT_SECRET', '').strip().strip('"')
 _tok = [None]
 
 
