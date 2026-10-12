@@ -35,6 +35,12 @@ button.up .sp{width:12px;height:12px;border:2px solid rgba(255,255,255,.4);borde
 button.up.busy .sp{display:inline-block;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .stamp{color:var(--muted);font-size:12px}
+.per{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:12.5px;flex-wrap:wrap}
+.per input[type=date]{border:1px solid var(--line);border-radius:7px;padding:4px 7px;font:inherit;color:var(--ink)}
+.per button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:7px;
+  padding:4px 10px;font:inherit;font-size:12px;cursor:pointer}
+.per button.on{background:var(--accent2);border-color:var(--accent2);color:#fff}
+th.sum{background:#5b4a8b;border-left:2px solid #fff} td.sum{background:#efebf7;font-weight:700;border-left:2px solid #d9d2ea}
 .stamp.err{color:var(--badink)}
 .scroll{overflow-x:auto}
 table{border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums}
@@ -70,14 +76,18 @@ tfoot td.nm{background:#fdf0e3}
       <span class="stamp" id="stamp"></span>
       <input type="search" id="q" placeholder="поиск партнёра">
       <label class="chk"><input type="checkbox" id="onlyzero"> только нулевые</label>
-      <label class="chk"><input type="checkbox" id="onlypast" checked> последние 3 дня</label>
+    </div>
+    <div class="per">период:
+      <input type="date" id="from"> – <input type="date" id="to">
+      <button data-p="3">3 дня</button><button data-p="7">7 дней</button>
+      <button data-p="month">этот месяц</button><button data-p="all">всё</button>
     </div>
   </div>
   <div class="scroll"><table id="t"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
   <div class="legend">
     <span><i class="sw" style="background:var(--fact)"></i>факт отметок за день (наведи — сколько операторов)</span>
-    <span><i class="sw" style="background:var(--bad)"></i>ни одной отметки за период</span>
-    <span>зелёным — факт ≥ плана 80%</span>
+    <span><i class="sw" style="background:var(--bad)"></i>ни одной отметки за выбранный период</span>
+    <span>зелёным — факт за день (или в среднем за период) ≥ плана 80%</span>
     <span>Старый план ОПУ — из прежней разбивки · Новый план ОПУ — численность операторов по выгрузке; «—» — партнёра нет в выгрузке · План 80% — от нового</span>
   </div>
 </div>
@@ -137,30 +147,55 @@ function kpis(){
   ].map(([l,v,n]) => '<div class="kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="n">'+n+'</div></div>').join('');
 }
 
+// период: кнопка-пресет (пересчитывается после «Обновить») или свои даты «с»/«по»
+let preset = '3';
+const $from = document.getElementById('from'), $to = document.getElementById('to');
+
+function applyPeriod(){
+  const first = D.days[0], last = D.have[D.have.length-1];
+  for(const el of [$from, $to]){ el.min = first; el.max = last; }
+  if(preset){
+    const ix = D.days.indexOf(last), m1 = last.slice(0,8) + '01';
+    $to.value = last;
+    $from.value = preset === 'all' ? first
+      : preset === 'month' ? (m1 < first ? first : m1)
+      : D.days[Math.max(0, ix - (+preset) + 1)];
+  }else{
+    if(!$from.value || $from.value < first) $from.value = first;
+    if(!$to.value || $to.value > last) $to.value = last;
+  }
+  if($from.value > $to.value) [$from.value, $to.value] = [$to.value, $from.value];
+  document.querySelectorAll('.per button').forEach(b => b.classList.toggle('on', b.dataset.p === preset));
+}
+
 function render(){
   if(!D) return;
+  applyPeriod();
   const q = document.getElementById('q').value.trim().toLowerCase();
   const oz = document.getElementById('onlyzero').checked;
-  const op = document.getElementById('onlypast').checked;
-  // по умолчанию — три последних дня с фактом; без галки — весь период
-  const idx = op ? D.days.map((d,i)=>i).filter(i => past(D.days[i])).slice(-3)
-                 : D.days.map((d,i)=>i);
-  const rs = D.rows.filter(r => (!q || r.name.toLowerCase().includes(q)) && (!oz || r.zero));
+  const idx = D.days.map((d,i)=>i).filter(i => past(D.days[i]) && D.days[i] >= $from.value && D.days[i] <= $to.value);
+  const n = idx.length;
+  const sum = r => idx.reduce((a,i)=>a+(r.f[i]||0),0);
+  const zero = r => sum(r) === 0;
+  const rs = D.rows.filter(r => (!q || r.name.toLowerCase().includes(q)) && (!oz || zero(r)));
+  const avgCls = (avg, p80) => p80 && avg >= p80 ? 'over' : (avg ? '' : 'under');
 
   document.querySelector('#t thead').innerHTML =
     '<tr><th class="nm" rowspan="2">Партнёр</th><th rowspan="2">Объектов</th><th rowspan="2">Старый план ОПУ</th><th rowspan="2">Новый план ОПУ</th><th rowspan="2">План 80%</th>' +
-    idx.map(i => '<th class="day">' + D.wd[i] + ' ' + dmy(D.days[i]) + '</th>').join('') + '</tr>' +
-    '<tr>' + idx.map(() => '<th class="lvl f">Факт</th>').join('') + '</tr>';
+    idx.map(i => '<th class="day">' + D.wd[i] + ' ' + dmy(D.days[i]) + '</th>').join('') +
+    '<th class="day sum" colspan="2">' + dmy(D.days[idx[0]]) + '–' + dmy(D.days[idx[n-1]]) + ' · ' + n + ' дн.</th></tr>' +
+    '<tr>' + idx.map(() => '<th class="lvl f">Факт</th>').join('') + '<th class="lvl sum">Сумма</th><th class="lvl sum">В среднем/день</th></tr>';
 
   document.querySelector('#t tbody').innerHTML = rs.map(r =>
-    '<tr class="' + (r.zero ? 'zero' : '') + '"><td class="nm">' + r.name + '</td><td>' + nf(r.obj) +
+    '<tr class="' + (zero(r) ? 'zero' : '') + '"><td class="nm">' + r.name + '</td><td>' + nf(r.obj) +
     '</td><td>' + nf(r.plan_old) + '</td><td>' + (r.plan === null ? '—' : nf(r.plan)) + '</td><td>' + (r.plan80 === null ? '—' : nf(r.plan80)) + '</td>' +
     idx.map(i => {
       const f = r.f[i];
       const cls = (f === null) ? 'f d0 na' : 'f d0 ' + (r.plan80 && f >= r.plan80 ? 'over' : (f ? '' : 'under'));
       const tip = (f === null) ? '' : ' title="операторов: ' + (r.o[i] || 0) + '"';
       return '<td class="' + cls + '"' + tip + '>' + (f === null ? '·' : (f || 0)) + '</td>';
-    }).join('') + '</tr>').join('');
+    }).join('') + (s => '<td class="sum">' + nf(s) + '</td><td class="sum ' + avgCls(s/n, r.plan80) + '">' + nf(Math.round(s/n)) + '</td>')(sum(r)) +
+    '</tr>').join('');
 
   document.querySelector('#t tfoot').innerHTML =
     '<tr><td class="nm">ИТОГО (' + rs.length + ')</td>' +
@@ -170,9 +205,14 @@ function render(){
       const p80 = rs.reduce((a,r)=>a+(r.plan80||0),0);
       const f = past(D.days[i]) ? rs.reduce((a,r)=>a+(r.f[i]||0),0) : null;
       return '<td class="d0 ' + (f===null?'na':(p80&&f>=p80?'over':'under')) + '">' + (f===null?'·':f) + '</td>';
-    }).join('') + '</tr>';
+    }).join('') + (() => {
+      const s = rs.reduce((a,r)=>a+sum(r),0), p80 = rs.reduce((a,r)=>a+(r.plan80||0),0);
+      return '<td class="sum">' + nf(s) + '</td><td class="sum ' + avgCls(s/n, p80) + '">' + nf(Math.round(s/n)) + '</td>';
+    })() + '</tr>';
 }
-['q','onlyzero','onlypast'].forEach(id => document.getElementById(id).oninput = render);
+['q','onlyzero'].forEach(id => document.getElementById(id).oninput = render);
+[$from, $to].forEach(el => el.onchange = () => { preset = null; render(); });
+document.querySelectorAll('.per button').forEach(b => b.onclick = () => { preset = b.dataset.p; render(); });
 document.getElementById('upd').onclick = load;
 load();
 </script>
