@@ -79,13 +79,14 @@ def build():
         f = fact.get(k) or [0 if d in have else None for d in days]
         o = ops.get(k) or [0 if d in have else None for d in days]
         plan = opu['plan'].get(r['name'])                 # None — партнёра нет в выгрузке
-        out.append({'name': r['name'], 'obj': r['obj'], 'plan': plan,
+        out.append({'name': r['name'], 'obj': r['obj'], 'plan_old': r['plan'], 'plan': plan,
                     'plan80': round(plan * 0.8) if plan is not None else None,
                     'f': f, 'o': o,
                     'zero': sum(v or 0 for v in f) == 0})
     # партнёров, которых нет в плане (TazaLike, Айсултан, ИП Оспанова, «Блеск»), в отчёт не выводим
 
-    tot = {'obj': sum(r['obj'] for r in out), 'plan': sum(r['plan'] or 0 for r in out),
+    tot = {'obj': sum(r['obj'] for r in out), 'plan_old': sum(r['plan_old'] for r in out),
+           'plan': sum(r['plan'] or 0 for r in out),
            'plan80': sum(r['plan80'] or 0 for r in out),
            'f': [(sum(r['f'][i] or 0 for r in out) if days[i] in have else None) for i in range(len(days))]}
 

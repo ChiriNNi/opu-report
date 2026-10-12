@@ -78,7 +78,7 @@ tfoot td.nm{background:#fdf0e3}
     <span><i class="sw" style="background:var(--fact)"></i>факт отметок за день (наведи — сколько операторов)</span>
     <span><i class="sw" style="background:var(--bad)"></i>ни одной отметки за период</span>
     <span>зелёным — факт ≥ плана 80%</span>
-    <span>План ОПУ — численность операторов партнёра по выгрузке; «—» — партнёра нет в выгрузке</span>
+    <span>Старый план ОПУ — из прежней разбивки · Новый план ОПУ — численность операторов по выгрузке; «—» — партнёра нет в выгрузке · План 80% — от нового</span>
   </div>
 </div>
 <script>
@@ -120,7 +120,7 @@ async function load(){
 
 function head(){
   document.getElementById('sub').textContent =
-    'План ОПУ — численность операторов партнёра за ' + my(D.plan_month) + ' · факт — отметки API Dream Square (Asia/Almaty) · дни ' +
+    'Новый план ОПУ — численность операторов партнёра за ' + my(D.plan_month) + ' · факт — отметки API Dream Square (Asia/Almaty) · дни ' +
     dmy(D.days[0]) + '–' + dmy(D.days[D.days.length-1]) + ' · факт заполнен по ' +
     dmy(D.have[D.have.length-1]) + ' · собрано ' + D.gen;
 }
@@ -129,7 +129,7 @@ function kpis(){
   const lastIdx = D.days.indexOf(D.have[D.have.length-1]);
   const factLast = D.tot.f[lastIdx];
   document.getElementById('kpis').innerHTML = [
-    ['План ОПУ', nf(D.tot.plan), 'операторов по списку за ' + my(D.plan_month)],
+    ['Новый план ОПУ', nf(D.tot.plan), 'операторов за ' + my(D.plan_month) + ' · старый ' + nf(D.tot.plan_old)],
     ['План 80%', nf(D.tot.plan80), 'целевой уровень'],
     ['Факт на ' + dmy(D.days[lastIdx]), nf(factLast), (D.tot.plan80 ? (factLast/D.tot.plan80*100).toFixed(1) : 0) + '% от плана 80%'],
     ['Объектов', nf(D.tot.obj), D.rows.length + ' партнёров'],
@@ -148,13 +148,13 @@ function render(){
   const rs = D.rows.filter(r => (!q || r.name.toLowerCase().includes(q)) && (!oz || r.zero));
 
   document.querySelector('#t thead').innerHTML =
-    '<tr><th class="nm" rowspan="2">Партнёр</th><th rowspan="2">Объектов</th><th rowspan="2">План ОПУ</th><th rowspan="2">План 80%</th>' +
+    '<tr><th class="nm" rowspan="2">Партнёр</th><th rowspan="2">Объектов</th><th rowspan="2">Старый план ОПУ</th><th rowspan="2">Новый план ОПУ</th><th rowspan="2">План 80%</th>' +
     idx.map(i => '<th class="day">' + D.wd[i] + ' ' + dmy(D.days[i]) + '</th>').join('') + '</tr>' +
     '<tr>' + idx.map(() => '<th class="lvl f">Факт</th>').join('') + '</tr>';
 
   document.querySelector('#t tbody').innerHTML = rs.map(r =>
     '<tr class="' + (r.zero ? 'zero' : '') + '"><td class="nm">' + r.name + '</td><td>' + nf(r.obj) +
-    '</td><td>' + (r.plan === null ? '—' : nf(r.plan)) + '</td><td>' + (r.plan80 === null ? '—' : nf(r.plan80)) + '</td>' +
+    '</td><td>' + nf(r.plan_old) + '</td><td>' + (r.plan === null ? '—' : nf(r.plan)) + '</td><td>' + (r.plan80 === null ? '—' : nf(r.plan80)) + '</td>' +
     idx.map(i => {
       const f = r.f[i];
       const cls = (f === null) ? 'f d0 na' : 'f d0 ' + (r.plan80 && f >= r.plan80 ? 'over' : (f ? '' : 'under'));
@@ -164,7 +164,7 @@ function render(){
 
   document.querySelector('#t tfoot').innerHTML =
     '<tr><td class="nm">ИТОГО (' + rs.length + ')</td>' +
-    '<td>' + nf(rs.reduce((a,r)=>a+r.obj,0)) + '</td><td>' + nf(rs.reduce((a,r)=>a+(r.plan||0),0)) + '</td>' +
+    '<td>' + nf(rs.reduce((a,r)=>a+r.obj,0)) + '</td><td>' + nf(rs.reduce((a,r)=>a+(r.plan_old||0),0)) + '</td><td>' + nf(rs.reduce((a,r)=>a+(r.plan||0),0)) + '</td>' +
     '<td>' + nf(rs.reduce((a,r)=>a+(r.plan80||0),0)) + '</td>' +
     idx.map(i => {
       const p80 = rs.reduce((a,r)=>a+(r.plan80||0),0);
