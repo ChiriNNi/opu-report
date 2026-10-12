@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Собирает data.json для отчёта: план на день из разбивки, факт отметок из API Dream Square.
+"""Собирает data.json для отчёта: план ОПУ (численность операторов), факт отметок из API Dream Square.
 
 Факт по каждому дню запрашивается заново, поэтому прошлые дни тоже пересчитываются.
 build() вызывает и этот скрипт (пишет data.json), и функция Vercel api/data.py (живая кнопка).
@@ -9,7 +9,8 @@ from concurrent.futures import ThreadPoolExecutor
 import ds_api
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PLAN = os.path.join(HERE, 'plan_daily.json')
+PLAN = os.path.join(HERE, 'plan_daily.json')           # партнёры, объекты, календарь
+PLAN_OPU = os.path.join(HERE, 'plan_opu.json')         # план ОПУ, собирается plan_from_xlsx.py
 OUT = os.environ.get('OUT', 'data.json')
 TZ_OFFSET = datetime.timedelta(hours=5)              # Asia/Almaty
 WD = [u'ПН', u'ВТ', u'СР', u'ЧТ', u'ПТ', u'СБ', u'ВС']
@@ -30,16 +31,13 @@ def build():
     TODAY = NOW.date()
     P = json.load(io.open(PLAN, encoding='utf-8'))
     days, rows = P['days'], P['rows']
+    opu = json.load(io.open(PLAN_OPU, encoding='utf-8'))
 
-    # разбивка кончается раньше сегодняшнего дня — дотягиваем календарь,
-    # на новых днях держим план последнего дня разбивки
+    # календарь из разбивки кончается раньше сегодняшнего дня — дотягиваем его
     _last = datetime.date(*map(int, days[-1].split('-')))
-    _hold = {id(r): r['daily'][-1] for r in rows}
     while _last < TODAY:
         _last += datetime.timedelta(1)
         days.append(_last.isoformat())
-        for _r in rows:
-            _r['daily'].append(_hold[id(_r)])
 
     plan_keys = {key(r['name']): i for i, r in enumerate(rows)}
 
@@ -80,19 +78,20 @@ def build():
         k = key(r['name'])
         f = fact.get(k) or [0 if d in have else None for d in days]
         o = ops.get(k) or [0 if d in have else None for d in days]
-        out.append({'name': r['name'], 'obj': r['obj'], 'plan': r['plan'], 'plan80': r['plan80'],
-                    'p': r['daily'], 'f': f, 'o': o,
+        plan = opu['plan'].get(r['name'])                 # None — партнёра нет в выгрузке
+        out.append({'name': r['name'], 'obj': r['obj'], 'plan': plan,
+                    'plan80': round(plan * 0.8) if plan is not None else None,
+                    'f': f, 'o': o,
                     'zero': sum(v or 0 for v in f) == 0})
     # партнёров, которых нет в плане (TazaLike, Айсултан, ИП Оспанова, «Блеск»), в отчёт не выводим
 
-    tot = {'obj': sum(r['obj'] for r in out), 'plan': sum(r['plan'] for r in out),
-           'plan80': sum(r['plan80'] for r in out),
-           'p': [sum(r['p'][i] for r in out) for i in range(len(days))],
+    tot = {'obj': sum(r['obj'] for r in out), 'plan': sum(r['plan'] or 0 for r in out),
+           'plan80': sum(r['plan80'] or 0 for r in out),
            'f': [(sum(r['f'][i] or 0 for r in out) if days[i] in have else None) for i in range(len(days))]}
 
     data = {'days': days,
             'wd': [WD[datetime.date(*map(int, d.split('-'))).weekday()] for d in days],
-            'have': have, 'rows': out, 'tot': tot,
+            'have': have, 'rows': out, 'tot': tot, 'plan_month': opu['month'],
             'gen': NOW.strftime('%d.%m.%Y %H:%M')}
     return data
 
