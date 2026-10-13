@@ -29,6 +29,16 @@ def reset_token():
     _tok[0] = None
 
 
+def operators(date, **extra):
+    """Поимённо: операторы партнёров за день, отметился / нет, время и объекты отметок."""
+    q = dict(extra)
+    q['date'] = date
+    r = urllib.request.Request(
+        BASE + '/api/dream-square/v1/reports/attendance/operators?' + urllib.parse.urlencode(q),
+        headers={'Authorization': 'Bearer ' + token()})
+    return json.loads(urllib.request.urlopen(r, timeout=90).read().decode())
+
+
 def attendance(frm, to, **extra):
     q = dict(extra)
     q['from'] = frm

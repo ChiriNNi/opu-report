@@ -63,9 +63,39 @@ tfoot td.nm{background:#fdf0e3}
 .over{color:var(--good)} .under{color:var(--badink)}
 .legend{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:11.5px;padding:9px 14px;border-top:1px solid var(--line)}
 .sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:5px;border:1px solid var(--line)}
+/* вкладки */
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--line);margin:4px 0 14px}
+.tabs a{padding:8px 16px;color:var(--muted);text-decoration:none;font-weight:600;border-radius:8px 8px 0 0;
+  border:1px solid transparent;border-bottom:none;margin-bottom:-2px}
+.tabs a.on{color:var(--accent);background:var(--card);border-color:var(--line);border-bottom:2px solid var(--card)}
+/* вкладка «Операторы» */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px;padding:12px 14px;align-items:start}
+details.pc{border:1px solid var(--line);border-radius:9px;background:var(--card)}
+details.pc>summary{list-style:none;cursor:pointer;padding:10px 12px}
+details.pc>summary::-webkit-details-marker{display:none}
+.pc .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.pc .pn{font-weight:700;font-size:14px}
+.pc .cnt{color:var(--muted);font-size:12px;white-space:nowrap}
+.pc .cnt b{color:var(--ink)}
+.bar{height:6px;background:#eef1f4;border-radius:4px;margin-top:7px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--good)}
+.bar.low i{background:#d9822b} .bar.vlow i{background:var(--badink)}
+.pc .body{border-top:1px solid var(--line);padding:8px 12px 12px;max-height:420px;overflow:auto}
+.pc h4{margin:8px 0 4px;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em}
+.pc h4.no{color:var(--badink)} .pc h4.yes{color:var(--good)}
+ul.ops{list-style:none;margin:0;padding:0}
+ul.ops li{padding:3px 0;border-bottom:1px dashed #eef1f4;display:flex;gap:8px;align-items:baseline}
+ul.ops.no li::before{content:'⏳';font-size:11px}
+ul.ops .t{font-variant-numeric:tabular-nums;color:var(--good);font-weight:600;min-width:38px}
+ul.ops .m{font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+ul.ops .o{color:var(--muted);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+mark{background:#fff3b0;padding:0}
+.empty{padding:20px 14px;color:var(--muted)}
 @media print{body{background:#fff}.ctl{display:none}.scroll{overflow:visible}}
 </style></head><body><div class="wrap">
 <h1>План / факт ОПУ по дням</h1>
+<nav class="tabs"><a href="#report" data-tab="report">Отчёт план / факт</a><a href="#operators" data-tab="operators">Операторы за день</a></nav>
+<section id="tab-report">
 <div class="sub" id="sub">загрузка данных…</div>
 <div class="kpis" id="kpis"></div>
 
@@ -91,6 +121,30 @@ tfoot td.nm{background:#fdf0e3}
     <span>Старый план ОПУ — из прежней разбивки · Новый план ОПУ — численность операторов по выгрузке; «—» — партнёра нет в выгрузке · План 80% — от нового</span>
   </div>
 </div>
+</section>
+
+<section id="tab-operators" hidden>
+<div class="sub" id="osub">операторы партнёров отчёта: кто уже отметился, а кто ещё нет · данные API Dream Square</div>
+<div class="kpis" id="okpis"></div>
+<div class="panel">
+  <div class="phead"><h2>Партнёры и их операторы</h2>
+    <div class="ctl">
+      <button class="up" id="oupd"><span class="sp"></span>Обновить</button>
+      <span class="stamp" id="ostamp"></span>
+      <input type="search" id="oq" placeholder="партнёр или ФИО оператора">
+      <input type="date" id="odate" style="border:1px solid var(--line);border-radius:7px;padding:4px 7px;font:inherit">
+      <label class="chk"><input type="checkbox" id="onlyno"> только не отметившиеся</label>
+    </div>
+  </div>
+  <div class="cards" id="cards"></div>
+  <div class="legend">
+    <span>⏳ — ещё не отметился за день</span>
+    <span>время — первая отметка, справа — объект(ы)</span>
+    <span>моб. — отметка с телефона, ручн. — ручная смена</span>
+    <span>сначала партнёры с наименьшей долей отметившихся; сегодняшний день обновляется сам раз в 5 минут</span>
+  </div>
+</div>
+</section>
 <script>
 let D = null;
 const nf = n => (n === null || n === undefined) ? '' : n.toLocaleString('ru-RU');
@@ -214,6 +268,86 @@ function render(){
 [$from, $to].forEach(el => el.onchange = () => { preset = null; render(); });
 document.querySelectorAll('.per button').forEach(b => b.onclick = () => { preset = b.dataset.p; render(); });
 document.getElementById('upd').onclick = load;
-load();
+
+// ── вкладка «Операторы за день» ───────────────────────────────────────────
+let O = null, oTimer = null;
+const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const $odate = document.getElementById('odate');
+const almatyToday = () => new Date(Date.now() + 5*3600e3).toISOString().slice(0,10);
+
+async function oload(){
+  const btn = document.getElementById('oupd'), stamp = document.getElementById('ostamp');
+  if(!$odate.value) $odate.value = almatyToday();
+  $odate.max = almatyToday();
+  btn.classList.add('busy'); btn.disabled = true; stamp.className = 'stamp'; stamp.textContent = 'обновляю…';
+  try{
+    O = await getJSON('api/operators?date=' + $odate.value + '&x=1');
+    stamp.textContent = 'данные на ' + O.gen;
+    orender();
+  }catch(e){
+    stamp.className = 'stamp err';
+    stamp.textContent = 'не удалось загрузить (' + e.message + ')';
+  }finally{
+    btn.classList.remove('busy'); btn.disabled = false;
+  }
+}
+
+function orender(){
+  if(!O) return;
+  const q = document.getElementById('oq').value.trim().toLowerCase();
+  const onlyNo = document.getElementById('onlyno').checked;
+  const re = q ? new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig') : null;
+  const hl = t => re ? esc(t).replace(re, '<mark>$1</mark>') : esc(t);
+  const tot = O.partners.reduce((a,p)=>a+p.total,0), chk = O.partners.reduce((a,p)=>a+p.checked,0);
+  document.getElementById('okpis').innerHTML = [
+    ['Операторов', nf(tot), O.partners.length + ' партнёров'],
+    ['Отметились', nf(chk), (tot ? (chk/tot*100).toFixed(1) : 0) + '% · ' + dmy(O.date)],
+    ['Ещё не отметились', nf(tot - chk), 'на ' + O.gen.slice(11)],
+  ].map(([l,v,n]) => '<div class="kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="n">'+n+'</div></div>').join('');
+
+  // поиск: сначала по имени партнёра (карточки раскрыты); если партнёр не нашёлся — по ФИО оператора
+  const byPartner = q && O.partners.some(p => p.name.toLowerCase().includes(q));
+  const list = O.partners.map(p => {
+    if(!q) return {p, ops: p.ops, open: false};
+    if(byPartner) return {p, ops: p.name.toLowerCase().includes(q) ? p.ops : [], open: true};
+    return {p, ops: p.ops.filter(o => o.n.toLowerCase().includes(q)), open: true};
+  }).filter(x => x.ops.length).sort((a,b) => a.p.checked/(a.p.total||1) - b.p.checked/(b.p.total||1));
+
+  document.getElementById('cards').innerHTML = list.length ? list.map(({p, ops, open}) => {
+    const pct = p.total ? p.checked/p.total*100 : 0;
+    const no = ops.filter(o => !o.c), yes = ops.filter(o => o.c);
+    return '<details class="pc"' + (open ? ' open' : '') + '><summary>' +
+      '<div class="top"><span class="pn">' + hl(p.name) + '</span><span class="cnt">отметились <b>' + p.checked + '</b> из ' + p.total +
+      ' · ещё нет <b>' + (p.total - p.checked) + '</b></span></div>' +
+      '<div class="bar' + (pct < 30 ? ' vlow' : pct < 60 ? ' low' : '') + '"><i style="width:' + pct.toFixed(1) + '%"></i></div></summary>' +
+      '<div class="body">' +
+      '<h4 class="no">Ещё не отметились (' + no.length + ')</h4>' +
+      (no.length ? '<ul class="ops no">' + no.map(o => '<li>' + hl(o.n) + (o.ph ? ' <span class="o">' + esc(o.ph) + '</span>' : '') + '</li>').join('') + '</ul>'
+                 : '<div class="o">все отметились</div>') +
+      (onlyNo ? '' : '<h4 class="yes">Отметились (' + yes.length + ')</h4><ul class="ops">' + yes.map(o =>
+        '<li><span class="t">' + o.t + '</span>' + hl(o.n) + ' <span class="m">' + (o.m === 'manual' ? 'ручн.' : 'моб.') + '</span>' +
+        '<span class="o" title="' + esc(o.obj.join('\n')) + '">' + esc(o.obj[0] || '') + (o.obj.length > 1 ? ' +' + (o.obj.length-1) : '') + '</span></li>').join('') + '</ul>') +
+      '</div></details>';
+  }).join('') : '<div class="empty">ничего не найдено</div>';
+}
+
+['oq','onlyno'].forEach(id => document.getElementById(id).oninput = orender);
+$odate.onchange = oload;
+document.getElementById('oupd').onclick = oload;
+
+// переключение вкладок по #report / #operators — ссылку на вкладку можно отправить кураторам
+function showTab(){
+  const t = location.hash === '#operators' ? 'operators' : 'report';
+  document.querySelectorAll('.tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === t));
+  document.getElementById('tab-report').hidden = t !== 'report';
+  document.getElementById('tab-operators').hidden = t !== 'operators';
+  clearInterval(oTimer);
+  if(t === 'operators'){
+    if(!O) oload();
+    oTimer = setInterval(() => { if(!document.hidden && $odate.value === almatyToday()) oload(); }, 5*60e3);
+  }else if(!D) load();
+}
+window.addEventListener('hashchange', showTab);
+showTab();
 </script>
 </div></body></html>

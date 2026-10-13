@@ -25,6 +25,21 @@ def key(n):
     return t[0].lower() + u'|' + (t[1][0].lower() if len(t) > 1 else '')
 
 
+def make_resolver(rows):
+    """Имя партнёра из API -> ключ партнёра отчёта; опечатки в фамилии (Ильясов / Илиясов) сводятся к одному."""
+    plan_keys = {key(r['name']) for r in rows}
+
+    def resolve(name):
+        k = key(name)
+        if k in plan_keys:
+            return k
+        sur, _, ini = k.partition(u'|')
+        best = difflib.get_close_matches(sur, [p.split(u'|')[0] for p in plan_keys
+                                               if p.split(u'|')[1] == ini], 1, 0.85)
+        return best[0] + u'|' + ini if best else k
+    return resolve
+
+
 def build():
     """План + факт на текущий момент; возвращает то, что лежит в data.json."""
     NOW = datetime.datetime.now(datetime.timezone.utc) + TZ_OFFSET
@@ -39,17 +54,7 @@ def build():
         _last += datetime.timedelta(1)
         days.append(_last.isoformat())
 
-    plan_keys = {key(r['name']): i for i, r in enumerate(rows)}
-
-    def resolve(name):
-        """Ключ партнёра из плана; опечатки в фамилии (Ильясов / Илиясов) сводятся к одному."""
-        k = key(name)
-        if k in plan_keys:
-            return k
-        sur, _, ini = k.partition(u'|')
-        best = difflib.get_close_matches(sur, [p.split(u'|')[0] for p in plan_keys
-                                               if p.split(u'|')[1] == ini], 1, 0.85)
-        return best[0] + u'|' + ini if best else k
+    resolve = make_resolver(rows)
 
     have = [d for d in days if datetime.date(*map(int, d.split('-'))) <= TODAY]
     # дни запрашиваем параллельно: в функции Vercel важна скорость ответа
@@ -95,6 +100,41 @@ def build():
             'have': have, 'rows': out, 'tot': tot, 'plan_month': opu['month'],
             'gen': NOW.strftime('%d.%m.%Y %H:%M')}
     return data
+
+
+SHOW_PHONES = False     # страница открыта без пароля — телефоны операторов наружу не отдаём
+
+
+def build_operators(date=None):
+    """Операторы партнёров отчёта за день: кто отметился, кто ещё нет (вкладка «Операторы»)."""
+    now = datetime.datetime.now(datetime.timezone.utc) + TZ_OFFSET
+    date = date or now.date().isoformat()
+    rows = json.load(io.open(PLAN, encoding='utf-8'))['rows']
+    names = {key(r['name']): r['name'] for r in rows}
+    resolve = make_resolver(rows)
+
+    ds_api.reset_token()
+    out = {}
+    for p in ds_api.operators(date)['partners']:
+        k = resolve(p['partnerName'])
+        if k not in names:              # партнёров вне отчёта не показываем
+            continue
+        part = out.setdefault(k, {'name': names[k], 'total': 0, 'checked': 0, 'ops': []})
+        part['total'] += p['operatorsTotal']
+        part['checked'] += p['operatorsCheckedIn']
+        for o in p['operators']:
+            op = {'n': ' '.join(o['fullName'].split()), 'c': o['checkedIn']}
+            if o['checkedIn']:
+                op['t'] = o['firstCheckInAt'][11:16]
+                op['m'] = o['method']
+                op['obj'] = [c['objectName'] for c in o['checkIns']]
+            if SHOW_PHONES:
+                op['ph'] = o.get('phone')
+            part['ops'].append(op)
+    for part in out.values():
+        part['ops'].sort(key=lambda o: (o['c'], o.get('t', ''), o['n']))
+    return {'date': date, 'gen': now.strftime('%d.%m.%Y %H:%M'),
+            'partners': sorted(out.values(), key=lambda p: p['name'])}
 
 
 if __name__ == '__main__':
