@@ -70,26 +70,43 @@ tfoot td.nm{background:#fdf0e3}
 .tabs a.on{color:var(--accent);background:var(--card);border-color:var(--line);border-bottom:2px solid var(--card)}
 /* вкладка «Операторы» */
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px;padding:12px 14px;align-items:start}
-details.pc{border:1px solid var(--line);border-radius:9px;background:var(--card)}
-details.pc>summary{list-style:none;cursor:pointer;padding:10px 12px}
-details.pc>summary::-webkit-details-marker{display:none}
+button.pc{display:block;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;
+  border:1px solid var(--line);border-radius:9px;background:var(--card);padding:10px 12px}
+button.pc:hover{border-color:var(--accent2);box-shadow:0 2px 8px rgba(31,78,120,.12)}
 .pc .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
 .pc .pn{font-weight:700;font-size:14px}
 .pc .cnt{color:var(--muted);font-size:12px;white-space:nowrap}
 .pc .cnt b{color:var(--ink)}
+.pc .hit{margin-top:6px;font-size:12px;color:var(--accent2)}
 .bar{height:6px;background:#eef1f4;border-radius:4px;margin-top:7px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--good)}
 .bar.low i{background:#d9822b} .bar.vlow i{background:var(--badink)}
-.pc .body{border-top:1px solid var(--line);padding:8px 12px 12px;max-height:420px;overflow:auto}
-.pc h4{margin:8px 0 4px;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em}
-.pc h4.no{color:var(--badink)} .pc h4.yes{color:var(--good)}
-ul.ops{list-style:none;margin:0;padding:0}
-ul.ops li{padding:3px 0;border-bottom:1px dashed #eef1f4;display:flex;gap:8px;align-items:baseline}
-ul.ops.no li::before{content:'⏳';font-size:11px}
-ul.ops .t{font-variant-numeric:tabular-nums;color:var(--good);font-weight:600;min-width:38px}
-ul.ops .m{font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px}
-ul.ops .o{color:var(--muted);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
 mark{background:#fff3b0;padding:0}
+dialog.md{border:none;border-radius:12px;padding:0;width:min(980px,96vw);max-height:90vh;
+  box-shadow:0 20px 60px rgba(0,0,0,.3);color:var(--ink)}
+dialog.md::backdrop{background:rgba(16,32,44,.45)}
+.md .mh{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:16px 18px 10px;border-bottom:1px solid var(--line)}
+.md .mh h3{margin:0;font-size:18px}
+.md .mh .n{color:var(--muted);font-size:12.5px;margin-top:3px}
+.md .x{border:none;background:none;font-size:24px;line-height:1;cursor:pointer;color:var(--muted);padding:0 4px}
+.md .mt{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--line)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:none;background:var(--card);font:inherit;padding:6px 12px;cursor:pointer;color:var(--muted);font-weight:600}
+.seg button.on.no{background:var(--badink);color:#fff} .seg button.on.yes{background:var(--good);color:#fff}
+.md .mt input{border:1px solid var(--line);border-radius:7px;padding:5px 9px;font:inherit;min-width:200px;flex:1}
+.md .cp{border:1px solid var(--accent);background:var(--card);color:var(--accent);border-radius:7px;padding:5px 12px;font:inherit;font-weight:600;cursor:pointer}
+dialog.md[open]{display:flex;flex-direction:column}
+.md .mb{overflow:auto;flex:1;min-height:0}
+.md table{width:100%}
+.md thead tr:last-child th{top:0}
+.md th{position:sticky;top:0;background:#f1f4f7;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.03em;text-align:left;z-index:1}
+.md td{text-align:left;white-space:normal}
+.md td.i{color:var(--muted);width:36px;text-align:right}
+.md td.ph{white-space:nowrap;font-variant-numeric:tabular-nums}
+.md td.ph a{color:var(--accent2);text-decoration:none} .md td.ph a:hover{text-decoration:underline}
+.md td.tm{white-space:nowrap;color:var(--good);font-weight:600;font-variant-numeric:tabular-nums}
+.md td.ob{color:var(--muted);font-size:12px}
+.md .m{font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px;white-space:nowrap}
 .empty{padding:20px 14px;color:var(--muted)}
 @media print{body{background:#fff}.ctl{display:none}.scroll{overflow:visible}}
 </style></head><body><div class="wrap">
@@ -133,17 +150,24 @@ mark{background:#fff3b0;padding:0}
       <span class="stamp" id="ostamp"></span>
       <input type="search" id="oq" placeholder="партнёр или ФИО оператора">
       <input type="date" id="odate" style="border:1px solid var(--line);border-radius:7px;padding:4px 7px;font:inherit">
-      <label class="chk"><input type="checkbox" id="onlyno"> только не отметившиеся</label>
     </div>
   </div>
   <div class="cards" id="cards"></div>
   <div class="legend">
-    <span>⏳ — ещё не отметился за день</span>
-    <span>время — первая отметка, справа — объект(ы)</span>
-    <span>моб. — отметка с телефона, ручн. — ручная смена</span>
+    <span>нажми на партнёра — откроется список: кто не отметился (с телефонами) и кто отметился</span>
     <span>сначала партнёры с наименьшей долей отметившихся; сегодняшний день обновляется сам раз в 5 минут</span>
   </div>
 </div>
+<dialog class="md" id="md">
+  <div class="mh"><div><h3 id="mname"></h3><div class="n" id="minfo"></div></div>
+    <button class="x" id="mclose" title="закрыть (Esc)">×</button></div>
+  <div class="mt">
+    <div class="seg"><button class="no" data-t="no" id="mtno"></button><button class="yes" data-t="yes" id="mtyes"></button></div>
+    <input type="search" id="mq" placeholder="поиск по ФИО или телефону">
+    <button class="cp" id="mcopy">Скопировать список</button>
+  </div>
+  <div class="mb"><table><thead id="mhead"></thead><tbody id="mbody"></tbody></table></div>
+</dialog>
 </section>
 <script>
 let D = null;
@@ -295,7 +319,6 @@ async function oload(){
 function orender(){
   if(!O) return;
   const q = document.getElementById('oq').value.trim().toLowerCase();
-  const onlyNo = document.getElementById('onlyno').checked;
   const re = q ? new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig') : null;
   const hl = t => re ? esc(t).replace(re, '<mark>$1</mark>') : esc(t);
   const tot = O.partners.reduce((a,p)=>a+p.total,0), chk = O.partners.reduce((a,p)=>a+p.checked,0);
@@ -305,33 +328,90 @@ function orender(){
     ['Ещё не отметились', nf(tot - chk), 'на ' + O.gen.slice(11)],
   ].map(([l,v,n]) => '<div class="kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="n">'+n+'</div></div>').join('');
 
-  // поиск: сначала по имени партнёра (карточки раскрыты); если партнёр не нашёлся — по ФИО оператора
+  // поиск: сначала по имени партнёра; если партнёр не нашёлся — по ФИО/телефону оператора
   const byPartner = q && O.partners.some(p => p.name.toLowerCase().includes(q));
   const list = O.partners.map(p => {
-    if(!q) return {p, ops: p.ops, open: false};
-    if(byPartner) return {p, ops: p.name.toLowerCase().includes(q) ? p.ops : [], open: true};
-    return {p, ops: p.ops.filter(o => o.n.toLowerCase().includes(q)), open: true};
-  }).filter(x => x.ops.length).sort((a,b) => a.p.checked/(a.p.total||1) - b.p.checked/(b.p.total||1));
+    if(!q || byPartner) return {p, hits: null, show: !q || p.name.toLowerCase().includes(q)};
+    const hits = p.ops.filter(o => opMatch(o, q));
+    return {p, hits, show: hits.length > 0};
+  }).filter(x => x.show).sort((a,b) => a.p.checked/(a.p.total||1) - b.p.checked/(b.p.total||1));
 
-  document.getElementById('cards').innerHTML = list.length ? list.map(({p, ops, open}) => {
+  document.getElementById('cards').innerHTML = list.length ? list.map(({p, hits}) => {
     const pct = p.total ? p.checked/p.total*100 : 0;
-    const no = ops.filter(o => !o.c), yes = ops.filter(o => o.c);
-    return '<details class="pc"' + (open ? ' open' : '') + '><summary>' +
+    return '<button class="pc" data-p="' + esc(p.name) + '">' +
       '<div class="top"><span class="pn">' + hl(p.name) + '</span><span class="cnt">отметились <b>' + p.checked + '</b> из ' + p.total +
       ' · ещё нет <b>' + (p.total - p.checked) + '</b></span></div>' +
-      '<div class="bar' + (pct < 30 ? ' vlow' : pct < 60 ? ' low' : '') + '"><i style="width:' + pct.toFixed(1) + '%"></i></div></summary>' +
-      '<div class="body">' +
-      '<h4 class="no">Ещё не отметились (' + no.length + ')</h4>' +
-      (no.length ? '<ul class="ops no">' + no.map(o => '<li>' + hl(o.n) + (o.ph ? ' <span class="o">' + esc(o.ph) + '</span>' : '') + '</li>').join('') + '</ul>'
-                 : '<div class="o">все отметились</div>') +
-      (onlyNo ? '' : '<h4 class="yes">Отметились (' + yes.length + ')</h4><ul class="ops">' + yes.map(o =>
-        '<li><span class="t">' + o.t + '</span>' + hl(o.n) + ' <span class="m">' + (o.m === 'manual' ? 'ручн.' : 'моб.') + '</span>' +
-        '<span class="o" title="' + esc(o.obj.join('\n')) + '">' + esc(o.obj[0] || '') + (o.obj.length > 1 ? ' +' + (o.obj.length-1) : '') + '</span></li>').join('') + '</ul>') +
-      '</div></details>';
+      '<div class="bar' + (pct < 30 ? ' vlow' : pct < 60 ? ' low' : '') + '"><i style="width:' + pct.toFixed(1) + '%"></i></div>' +
+      (hits ? '<div class="hit">найдено: ' + hits.map(o => hl(o.n) + (o.c ? ' ✓' : ' ⏳')).join(', ') + '</div>' : '') +
+      '</button>';
   }).join('') : '<div class="empty">ничего не найдено</div>';
+  if($md.open) mrender();
 }
 
-['oq','onlyno'].forEach(id => document.getElementById(id).oninput = orender);
+// ── модальное окно партнёра ──
+const $md = document.getElementById('md');
+let mPartner = null, mTab = 'no';
+const digits = t => String(t || '').replace(/\D/g, '');
+const opMatch = (o, q) => o.n.toLowerCase().includes(q) || (digits(q).length >= 3 && digits(o.ph).includes(digits(q)));
+const fmtPh = p => { const d = digits(p);
+  return d.length === 11 ? '+' + d[0] + ' ' + d.slice(1,4) + ' ' + d.slice(4,7) + ' ' + d.slice(7,9) + ' ' + d.slice(9) : (p || ''); };
+
+function mopen(name, q){
+  mPartner = name;
+  const p = O.partners.find(x => x.name === name);
+  mTab = p && p.checked === p.total ? 'yes' : 'no';
+  document.getElementById('mq').value = q || '';
+  if(q){ const hit = p.ops.find(o => opMatch(o, q.toLowerCase())); if(hit) mTab = hit.c ? 'yes' : 'no'; }
+  mrender();
+  if(!$md.open) $md.showModal();
+}
+
+function mrender(){
+  const p = O.partners.find(x => x.name === mPartner);
+  if(!p){ $md.close(); return; }
+  const q = document.getElementById('mq').value.trim().toLowerCase();
+  const no = p.ops.filter(o => !o.c), yes = p.ops.filter(o => o.c);
+  const rows = (mTab === 'no' ? no : yes).filter(o => !q || opMatch(o, q));
+  const re = q ? new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig') : null;
+  const hl = t => re ? esc(t).replace(re, '<mark>$1</mark>') : esc(t);
+  document.getElementById('mname').textContent = p.name;
+  document.getElementById('minfo').textContent = 'операторов ' + p.total + ' · отметились ' + p.checked +
+    ' (' + (p.total ? Math.round(p.checked/p.total*100) : 0) + '%) · ' + dmy(O.date) + ' · данные на ' + O.gen.slice(11);
+  document.getElementById('mtno').textContent = '⏳ Не отметились · ' + no.length;
+  document.getElementById('mtyes').textContent = '✓ Отметились · ' + yes.length;
+  document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.t === mTab));
+  const ph = o => o.ph ? '<a href="tel:+' + digits(o.ph) + '">' + hl(fmtPh(o.ph)) + '</a>' : '<span style="color:var(--muted)">нет</span>';
+  document.getElementById('mhead').innerHTML = mTab === 'no'
+    ? '<tr><th class="i">№</th><th>ФИО</th><th>Телефон</th></tr>'
+    : '<tr><th class="i">№</th><th>ФИО</th><th>Телефон</th><th>Отметка</th><th>Объект</th></tr>';
+  document.getElementById('mbody').innerHTML = rows.length ? rows.map((o, i) => mTab === 'no'
+    ? '<tr><td class="i">' + (i+1) + '</td><td>' + hl(o.n) + '</td><td class="ph">' + ph(o) + '</td></tr>'
+    : '<tr><td class="i">' + (i+1) + '</td><td>' + hl(o.n) + '</td><td class="ph">' + ph(o) + '</td><td class="tm">' + o.t +
+      ' <span class="m">' + (o.m === 'manual' ? 'ручн.' : 'моб.') + '</span></td><td class="ob">' + o.obj.map(esc).join('<br>') + '</td></tr>'
+  ).join('') : '<tr><td colspan="5" class="empty">' + (q ? 'ничего не найдено' : mTab === 'no' ? 'все отметились' : 'пока никто не отметился') + '</td></tr>';
+  document.getElementById('mcopy').textContent = 'Скопировать список (' + rows.length + ')';
+}
+
+document.getElementById('cards').onclick = e => {
+  const b = e.target.closest('button.pc');
+  if(b) mopen(b.dataset.p, document.getElementById('oq').value.trim() && !b.querySelector('.pn mark') ? document.getElementById('oq').value.trim() : '');
+};
+document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { mTab = b.dataset.t; mrender(); });
+document.getElementById('mq').oninput = mrender;
+document.getElementById('mclose').onclick = () => $md.close();
+$md.addEventListener('click', e => { if(e.target === $md) $md.close(); });   // клик по затемнению
+document.getElementById('mcopy').onclick = async () => {
+  const p = O.partners.find(x => x.name === mPartner), q = document.getElementById('mq').value.trim().toLowerCase();
+  const rows = p.ops.filter(o => (mTab === 'no' ? !o.c : o.c) && (!q || opMatch(o, q)));
+  const text = p.name + ' — ' + (mTab === 'no' ? 'не отметились' : 'отметились') + ' на ' + dmy(O.date) + ' (' + rows.length + '):\n' +
+    rows.map((o, i) => (i+1) + '. ' + o.n + (o.ph ? ' — ' + fmtPh(o.ph) : '') + (mTab === 'yes' ? ' — ' + o.t : '')).join('\n');
+  const btn = document.getElementById('mcopy');
+  try{ await navigator.clipboard.writeText(text); btn.textContent = 'Скопировано ✓'; }
+  catch(e){ btn.textContent = 'Не удалось скопировать'; }
+  setTimeout(mrender, 1500);
+};
+
+document.getElementById('oq').oninput = orender;
 $odate.onchange = oload;
 document.getElementById('oupd').onclick = oload;
 

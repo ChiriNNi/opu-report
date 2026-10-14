@@ -102,7 +102,7 @@ def build():
     return data
 
 
-SHOW_PHONES = False     # страница открыта без пароля — телефоны операторов наружу не отдаём
+SHOW_PHONES = True      # телефоны операторов на вкладке «Операторы» (страница без пароля)
 
 
 def build_operators(date=None):
