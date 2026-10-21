@@ -58,6 +58,15 @@ td.f.na{background:#f4f6f8;color:#c3cad2}
 td.d0{border-left:2px solid #eceff2}
 tbody tr:hover td{filter:brightness(.97)}
 tr.zero td,tr.zero td.nm{background:var(--bad);color:var(--badink);font-weight:600}
+td.nm .tg{cursor:pointer;user-select:none}
+td.nm .tg::before{content:'▸';display:inline-block;width:14px;color:var(--muted);transition:transform .15s}
+tr.open td.nm .tg::before{transform:rotate(90deg)}
+td.nm .tg:hover{color:var(--accent2)}
+td.nm .nc{color:var(--muted);font-size:11px;font-weight:400;margin-left:4px}
+tr.city td{background:#fafbfc;font-size:12px;color:#3d4a57;border-bottom-color:#eef1f4}
+tr.city td.nm{background:#fafbfc;padding-left:30px}
+tr.city td.f{background:#f1f7ee;font-weight:500}
+tr.city td.sum{background:#f6f3fb;font-weight:600}
 tfoot td{background:#fdf0e3;font-weight:700;border-top:2px solid var(--line)}
 tfoot td.nm{background:#fdf0e3}
 .over{color:var(--good)} .under{color:var(--badink)}
@@ -135,6 +144,7 @@ dialog.md[open]{display:flex;flex-direction:column}
     <span><i class="sw" style="background:var(--fact)"></i>факт отметок за день (наведи — сколько операторов)</span>
     <span><i class="sw" style="background:var(--bad)"></i>ни одной отметки за выбранный период</span>
     <span>зелёным — факт за день (или в среднем за период) ≥ плана 80%</span>
+    <span>▸ нажми на партнёра — отметки по городам</span>
     <span>Старый план ОПУ — из прежней разбивки · Новый план ОПУ — численность операторов по выгрузке; «—» — партнёра нет в выгрузке · План 80% — от нового</span>
   </div>
 </div>
@@ -264,8 +274,18 @@ function render(){
     '<th class="day sum" colspan="2">' + dmy(D.days[idx[0]]) + '–' + dmy(D.days[idx[n-1]]) + ' · ' + n + ' дн.</th></tr>' +
     '<tr>' + idx.map(() => '<th class="lvl f">Факт</th>').join('') + '<th class="lvl sum">Сумма</th><th class="lvl sum">В среднем/день</th></tr>';
 
+  // города партнёра — по убыванию отметок за выбранный период
+  const cityRows = r => !opened.has(r.name) ? '' : (r.cities || [])
+    .map(c => ({c, s: idx.reduce((a,i)=>a+(c.f[i]||0),0)})).sort((x,y) => y.s - x.s).map(({c, s}) => {
+    return '<tr class="city"><td class="nm">' + c.name + '</td><td></td><td></td><td></td><td></td>' +
+      idx.map(i => c.f[i] === null ? '<td class="f d0 na">·</td>'
+        : '<td class="f d0" title="операторов: ' + (c.o[i] || 0) + '">' + c.f[i] + '</td>').join('') +
+      '<td class="sum">' + nf(s) + '</td><td class="sum">' + nf(Math.round(s/n)) + '</td></tr>';
+  }).join('');
   document.querySelector('#t tbody').innerHTML = rs.map(r =>
-    '<tr class="' + (zero(r) ? 'zero' : '') + '"><td class="nm">' + r.name + '</td><td>' + nf(r.obj) +
+    '<tr class="' + (zero(r) ? 'zero' : '') + (opened.has(r.name) ? ' open' : '') + '"><td class="nm">' +
+    ((r.cities || []).length ? '<span class="tg" data-p="' + r.name + '" title="показать по городам">' + r.name + '</span><span class="nc">' + r.cities.length + ' г.</span>' : r.name) +
+    '</td><td>' + nf(r.obj) +
     '</td><td>' + nf(r.plan_old) + '</td><td>' + (r.plan === null ? '—' : nf(r.plan)) + '</td><td>' + (r.plan80 === null ? '—' : nf(r.plan80)) + '</td>' +
     idx.map(i => {
       const f = r.f[i];
@@ -273,7 +293,7 @@ function render(){
       const tip = (f === null) ? '' : ' title="операторов: ' + (r.o[i] || 0) + '"';
       return '<td class="' + cls + '"' + tip + '>' + (f === null ? '·' : (f || 0)) + '</td>';
     }).join('') + (s => '<td class="sum">' + nf(s) + '</td><td class="sum ' + avgCls(s/n, r.plan80) + '">' + nf(Math.round(s/n)) + '</td>')(sum(r)) +
-    '</tr>').join('');
+    '</tr>' + cityRows(r)).join('');
 
   document.querySelector('#t tfoot').innerHTML =
     '<tr><td class="nm">ИТОГО (' + rs.length + ')</td>' +
@@ -289,6 +309,14 @@ function render(){
     })() + '</tr>';
 }
 ['q','onlyzero'].forEach(id => document.getElementById(id).oninput = render);
+// клик по имени партнёра — раскрыть/свернуть отметки по городам
+const opened = new Set();
+document.querySelector('#t tbody').addEventListener('click', e => {
+  const t = e.target.closest('.tg');
+  if(!t) return;
+  opened.has(t.dataset.p) ? opened.delete(t.dataset.p) : opened.add(t.dataset.p);
+  render();
+});
 [$from, $to].forEach(el => el.onchange = () => { preset = null; render(); });
 document.querySelectorAll('.per button').forEach(b => b.onclick = () => { preset = b.dataset.p; render(); });
 document.getElementById('upd').onclick = load;

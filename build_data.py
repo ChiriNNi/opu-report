@@ -40,6 +40,15 @@ def make_resolver(rows):
     return resolve
 
 
+def city_rows(by_city, days, have):
+    """Города партнёра: факт по дням (0 там, где день прошёл, а отметок не было), сначала крупные."""
+    rows = []
+    for name, c in by_city.items():
+        fill = lambda a: [(v or 0) if d in have else None for v, d in zip(a, days)]
+        rows.append({'name': name, 'f': fill(c['f']), 'o': fill(c['o'])})
+    return sorted(rows, key=lambda r: (-sum(v or 0 for v in r['f']), r['name']))
+
+
 def build():
     """План + факт на текущий момент; возвращает то, что лежит в data.json."""
     NOW = datetime.datetime.now(datetime.timezone.utc) + TZ_OFFSET
@@ -61,8 +70,9 @@ def build():
     ds_api.reset_token()
     ds_api.token()
     with ThreadPoolExecutor(8) as ex:
-        resp = dict(zip(have, ex.map(lambda d: ds_api.attendance(d, d), have)))
+        resp = dict(zip(have, ex.map(lambda d: ds_api.attendance(d, d, groupBy='city'), have)))
     fact, ops = {}, {}
+    cities = {}                         # ключ партнёра -> город -> {'f': [...], 'o': [...]} по дням
     for i, d in enumerate(days):
         if d not in have:
             continue
@@ -72,6 +82,11 @@ def build():
             ops.setdefault(k, [None] * len(days))
             fact[k][i] = (fact[k][i] or 0) + p['shiftsCount']
             ops[k][i] = (ops[k][i] or 0) + p['operatorsCheckedIn']
+            for c in p.get('cities') or []:
+                cc = cities.setdefault(k, {}).setdefault(c['city'] or u'город не указан',
+                                                         {'f': [None] * len(days), 'o': [None] * len(days)})
+                cc['f'][i] = (cc['f'][i] or 0) + c['shiftsCount']
+                cc['o'][i] = (cc['o'][i] or 0) + c['operatorsCheckedIn']
     for k in fact:
         for i, d in enumerate(days):
             if d in have and fact[k][i] is None:
@@ -87,6 +102,7 @@ def build():
         out.append({'name': r['name'], 'obj': r['obj'], 'plan_old': r['plan'], 'plan': plan,
                     'plan80': round(plan * 0.8) if plan is not None else None,
                     'f': f, 'o': o,
+                    'cities': city_rows(cities.get(k, {}), days, have),
                     'zero': sum(v or 0 for v in f) == 0})
     # партнёров, которых нет в плане (TazaLike, Айсултан, ИП Оспанова, «Блеск»), в отчёт не выводим
 
