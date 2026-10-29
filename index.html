@@ -117,6 +117,13 @@ dialog.md[open]{display:flex;flex-direction:column}
 .md td.ob{color:var(--muted);font-size:12px}
 .md .m{font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px;white-space:nowrap}
 .empty{padding:20px 14px;color:var(--muted)}
+.duo{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}
+.duo>.panel{min-width:0}
+.duo>.main{flex:1 1 640px}
+.duo>.adm{flex:0 1 auto;width:min-content;min-width:min(360px,100%);max-width:100%}
+th.day.cu{background:#7a5a2b} th.lvl.cu{background:#a0763a}
+td.cu{background:#fbf3e6;font-weight:600}
+td.cu.z{color:#c3cad2;font-weight:400}
 @media print{body{background:#fff}.ctl{display:none}.scroll{overflow:visible}}
 </style></head><body><div class="wrap">
 <h1>План / факт ОПУ по дням</h1>
@@ -125,7 +132,8 @@ dialog.md[open]{display:flex;flex-direction:column}
 <div class="sub" id="sub">загрузка данных…</div>
 <div class="kpis" id="kpis"></div>
 
-<div class="panel">
+<div class="duo">
+<div class="panel main">
   <div class="phead"><h2>Партнёры: план ОПУ и факт отметок за день</h2>
     <div class="ctl">
       <button class="up" id="upd"><span class="sp"></span>Обновить</button>
@@ -147,6 +155,15 @@ dialog.md[open]{display:flex;flex-direction:column}
     <span>▸ нажми на партнёра — отметки по городам</span>
     <span>Старый план ОПУ — из прежней разбивки · Новый план ОПУ — численность операторов по выгрузке; «—» — партнёра нет в выгрузке · План 80% — от нового</span>
   </div>
+</div>
+<div class="panel adm">
+  <div class="phead"><h2>Админы клининговой компании: отметки</h2></div>
+  <div class="scroll"><table id="ta"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
+  <div class="legend">
+    <span>отметки админов компании партнёра (кураторов) — в факт ОПУ не входят · наведи — сколько админов</span>
+    <span>показаны партнёры, у которых админы отмечались в периоде · период и поиск — общие с основной таблицей</span>
+  </div>
+</div>
 </div>
 </section>
 
@@ -307,6 +324,26 @@ function render(){
       const s = rs.reduce((a,r)=>a+sum(r),0), p80 = rs.reduce((a,r)=>a+(r.plan80||0),0);
       return '<td class="sum">' + nf(s) + '</td><td class="sum ' + avgCls(s/n, p80) + '">' + nf(Math.round(s/n)) + '</td>';
     })() + '</tr>';
+  radm(rs, idx);
+}
+
+// таблица админов компании: те же партнёры, дни и период, что и в основной
+function radm(rs, idx){
+  const n = idx.length, cs = r => idx.reduce((a,i)=>a+((r.cur||[])[i]||0),0);
+  document.querySelector('#ta thead').innerHTML =
+    '<tr><th class="nm" rowspan="2">Партнёр</th>' + idx.map(i => '<th class="day cu">' + D.wd[i] + ' ' + dmy(D.days[i]) + '</th>').join('') +
+    '<th class="day sum" rowspan="2">Сумма<br>' + n + ' дн.</th></tr>' +
+    '<tr>' + idx.map(() => '<th class="lvl cu">Отметок</th>').join('') + '</tr>';
+  const cell = (v, p) => v === null || v === undefined ? '<td class="cu d0 z">·</td>'
+    : '<td class="cu d0' + (v ? '' : ' z') + '" title="админов: ' + (p || 0) + '">' + v + '</td>';
+  // только партнёры, у которых админы отмечались в периоде, — по убыванию
+  const ra = rs.filter(r => cs(r) > 0).sort((x,y) => cs(y) - cs(x));
+  document.querySelector('#ta tbody').innerHTML = (ra.length ? '' : '<tr><td class="nm" colspan="' + (n + 2) + '" style="color:var(--muted)">за период админы не отмечались</td></tr>') + ra.map(r =>
+    '<tr><td class="nm">' + r.name + '</td>' + idx.map(i => cell((r.cur||[])[i], (r.curp||[])[i])).join('') +
+    '<td class="sum">' + nf(cs(r)) + '</td></tr>').join('');
+  document.querySelector('#ta tfoot').innerHTML = '<tr><td class="nm">ИТОГО (' + ra.length + ' из ' + rs.length + ')</td>' +
+    idx.map(i => cell(rs.reduce((a,r)=>a+((r.cur||[])[i]||0),0), rs.reduce((a,r)=>a+((r.curp||[])[i]||0),0))).join('') +
+    '<td class="sum">' + nf(rs.reduce((a,r)=>a+cs(r),0)) + '</td></tr>';
 }
 ['q','onlyzero'].forEach(id => document.getElementById(id).oninput = render);
 // клик по имени партнёра — раскрыть/свернуть отметки по городам

@@ -72,6 +72,7 @@ def build():
     with ThreadPoolExecutor(8) as ex:
         resp = dict(zip(have, ex.map(lambda d: ds_api.attendance(d, d, groupBy='city'), have)))
     fact, ops = {}, {}
+    cur, curp = {}, {}                  # админы компании (кураторы): отметки и люди по дням
     cities = {}                         # ключ партнёра -> город -> {'f': [...], 'o': [...]} по дням
     for i, d in enumerate(days):
         if d not in have:
@@ -82,6 +83,10 @@ def build():
             ops.setdefault(k, [None] * len(days))
             fact[k][i] = (fact[k][i] or 0) + p['shiftsCount']
             ops[k][i] = (ops[k][i] or 0) + p['operatorsCheckedIn']
+            cur.setdefault(k, [None] * len(days))
+            curp.setdefault(k, [None] * len(days))
+            cur[k][i] = (cur[k][i] or 0) + (p.get('curatorsShiftsCount') or 0)
+            curp[k][i] = (curp[k][i] or 0) + (p.get('curatorsCheckedIn') or 0)
             for c in p.get('cities') or []:
                 cc = cities.setdefault(k, {}).setdefault(c['city'] or u'город не указан',
                                                          {'f': [None] * len(days), 'o': [None] * len(days)})
@@ -92,6 +97,8 @@ def build():
             if d in have and fact[k][i] is None:
                 fact[k][i] = 0
                 ops[k][i] = 0
+                cur[k][i] = 0
+                curp[k][i] = 0
 
     out = []
     for r in rows:
@@ -102,6 +109,8 @@ def build():
         out.append({'name': r['name'], 'obj': r['obj'], 'plan_old': r['plan'], 'plan': plan,
                     'plan80': round(plan * 0.8) if plan is not None else None,
                     'f': f, 'o': o,
+                    'cur': cur.get(k) or [0 if d in have else None for d in days],
+                    'curp': curp.get(k) or [0 if d in have else None for d in days],
                     'cities': city_rows(cities.get(k, {}), days, have),
                     'zero': sum(v or 0 for v in f) == 0})
     # партнёров, которых нет в плане (TazaLike, Айсултан, ИП Оспанова, «Блеск»), в отчёт не выводим
