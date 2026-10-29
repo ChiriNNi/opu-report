@@ -73,6 +73,7 @@ def build():
         resp = dict(zip(have, ex.map(lambda d: ds_api.attendance(d, d, groupBy='city'), have)))
     fact, ops = {}, {}
     cur, curp = {}, {}                  # админы компании (кураторы): отметки и люди по дням
+    own = {}                            # отметки самого партнёра; None — партнёр не указан в настройках API
     cities = {}                         # ключ партнёра -> город -> {'f': [...], 'o': [...]} по дням
     for i, d in enumerate(days):
         if d not in have:
@@ -87,6 +88,9 @@ def build():
             curp.setdefault(k, [None] * len(days))
             cur[k][i] = (cur[k][i] or 0) + (p.get('curatorsShiftsCount') or 0)
             curp[k][i] = (curp[k][i] or 0) + (p.get('curatorsCheckedIn') or 0)
+            own.setdefault(k, [None] * len(days))
+            if p.get('partnerOwnShiftsCount') is not None:
+                own[k][i] = (own[k][i] or 0) + p['partnerOwnShiftsCount']
             for c in p.get('cities') or []:
                 cc = cities.setdefault(k, {}).setdefault(c['city'] or u'город не указан',
                                                          {'f': [None] * len(days), 'o': [None] * len(days)})
@@ -111,6 +115,7 @@ def build():
                     'f': f, 'o': o,
                     'cur': cur.get(k) or [0 if d in have else None for d in days],
                     'curp': curp.get(k) or [0 if d in have else None for d in days],
+                    'own': own.get(k) or [None] * len(days),
                     'cities': city_rows(cities.get(k, {}), days, have),
                     'zero': sum(v or 0 for v in f) == 0})
     # партнёров, которых нет в плане (TazaLike, Айсултан, ИП Оспанова, «Блеск»), в отчёт не выводим

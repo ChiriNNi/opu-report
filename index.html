@@ -124,6 +124,7 @@ dialog.md[open]{display:flex;flex-direction:column}
 th.day.cu{background:#7a5a2b} th.lvl.cu{background:#a0763a}
 td.cu{background:#fbf3e6;font-weight:600}
 td.cu.z{color:#c3cad2;font-weight:400}
+th.lvl.ow{background:#5f7a8c} td.ow{background:#eef3f6;font-weight:600} td.ow.z{color:#c3cad2;font-weight:400}
 @media print{body{background:#fff}.ctl{display:none}.scroll{overflow:visible}}
 </style></head><body><div class="wrap">
 <h1>План / факт ОПУ по дням</h1>
@@ -157,11 +158,12 @@ td.cu.z{color:#c3cad2;font-weight:400}
   </div>
 </div>
 <div class="panel adm">
-  <div class="phead"><h2>Админы клининговой компании: отметки</h2></div>
+  <div class="phead"><h2>Админы компании и сам партнёр: отметки</h2></div>
   <div class="scroll"><table id="ta"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
   <div class="legend">
     <span>отметки админов компании партнёра (кураторов) — в факт ОПУ не входят · наведи — сколько админов</span>
-    <span>показаны партнёры, у которых админы отмечались в периоде · период и поиск — общие с основной таблицей</span>
+    <span>Партнёр — отметки самого партнёра; «—» — партнёр не указан в настройках API</span>
+    <span>показаны партнёры, у которых админы или сам партнёр отмечались в периоде · период и поиск — общие с основной таблицей</span>
   </div>
 </div>
 </div>
@@ -329,21 +331,27 @@ function render(){
 
 // таблица админов компании: те же партнёры, дни и период, что и в основной
 function radm(rs, idx){
-  const n = idx.length, cs = r => idx.reduce((a,i)=>a+((r.cur||[])[i]||0),0);
+  const n = idx.length, at = (a, i) => (a || [])[i];
+  const cs = r => idx.reduce((a,i)=>a+(at(r.cur,i)||0),0), os = r => idx.reduce((a,i)=>a+(at(r.own,i)||0),0);
+  const noOwn = r => idx.every(i => at(r.own,i) === null || at(r.own,i) === undefined);
   document.querySelector('#ta thead').innerHTML =
-    '<tr><th class="nm" rowspan="2">Партнёр</th>' + idx.map(i => '<th class="day cu">' + D.wd[i] + ' ' + dmy(D.days[i]) + '</th>').join('') +
-    '<th class="day sum" rowspan="2">Сумма<br>' + n + ' дн.</th></tr>' +
-    '<tr>' + idx.map(() => '<th class="lvl cu">Отметок</th>').join('') + '</tr>';
-  const cell = (v, p) => v === null || v === undefined ? '<td class="cu d0 z">·</td>'
-    : '<td class="cu d0' + (v ? '' : ' z') + '" title="админов: ' + (p || 0) + '">' + v + '</td>';
-  // только партнёры, у которых админы отмечались в периоде, — по убыванию
-  const ra = rs.filter(r => cs(r) > 0).sort((x,y) => cs(y) - cs(x));
-  document.querySelector('#ta tbody').innerHTML = (ra.length ? '' : '<tr><td class="nm" colspan="' + (n + 2) + '" style="color:var(--muted)">за период админы не отмечались</td></tr>') + ra.map(r =>
-    '<tr><td class="nm">' + r.name + '</td>' + idx.map(i => cell((r.cur||[])[i], (r.curp||[])[i])).join('') +
-    '<td class="sum">' + nf(cs(r)) + '</td></tr>').join('');
+    '<tr><th class="nm" rowspan="2">Партнёр</th>' + idx.map(i => '<th class="day cu" colspan="2">' + D.wd[i] + ' ' + dmy(D.days[i]) + '</th>').join('') +
+    '<th class="day sum" colspan="2">Сумма · ' + n + ' дн.</th></tr>' +
+    '<tr>' + idx.map(() => '<th class="lvl cu">Админы</th><th class="lvl ow">Партнёр</th>').join('') +
+    '<th class="lvl sum">Админы</th><th class="lvl sum">Партнёр</th></tr>';
+  const cell = (v, tip, cls) => v === null || v === undefined
+    ? '<td class="' + cls + ' z" title="партнёр не указан в настройках API">—</td>'
+    : '<td class="' + cls + (v ? '' : ' z') + '"' + (tip ? ' title="' + tip + '"' : '') + '>' + v + '</td>';
+  const days = (cu, cp, ow) => idx.map(i => cell(at(cu,i), 'админов: ' + (at(cp,i) || 0), 'cu d0') + cell(at(ow,i), '', 'ow')).join('');
+  // только партнёры, у которых админы или сам партнёр отмечались в периоде, — по убыванию
+  const ra = rs.filter(r => cs(r) + os(r) > 0).sort((x,y) => cs(y) + os(y) - cs(x) - os(x));
+  document.querySelector('#ta tbody').innerHTML = (ra.length ? '' : '<tr><td class="nm" colspan="' + (2*n + 3) + '" style="color:var(--muted)">за период ни админы, ни партнёры не отмечались</td></tr>') + ra.map(r =>
+    '<tr><td class="nm">' + r.name + '</td>' + days(r.cur, r.curp, r.own) +
+    '<td class="sum">' + nf(cs(r)) + '</td><td class="sum">' + (noOwn(r) ? '—' : nf(os(r))) + '</td></tr>').join('');
+  const tot = k => idx.map((_, j) => rs.reduce((a,r)=>a+(at(r[k], idx[j])||0),0)), pad = a => { const o = []; idx.forEach((i,j) => o[i] = a[j]); return o; };
   document.querySelector('#ta tfoot').innerHTML = '<tr><td class="nm">ИТОГО (' + ra.length + ' из ' + rs.length + ')</td>' +
-    idx.map(i => cell(rs.reduce((a,r)=>a+((r.cur||[])[i]||0),0), rs.reduce((a,r)=>a+((r.curp||[])[i]||0),0))).join('') +
-    '<td class="sum">' + nf(rs.reduce((a,r)=>a+cs(r),0)) + '</td></tr>';
+    days(pad(tot('cur')), pad(tot('curp')), pad(tot('own'))) +
+    '<td class="sum">' + nf(rs.reduce((a,r)=>a+cs(r),0)) + '</td><td class="sum">' + nf(rs.reduce((a,r)=>a+os(r),0)) + '</td></tr>';
 }
 ['q','onlyzero'].forEach(id => document.getElementById(id).oninput = render);
 // клик по имени партнёра — раскрыть/свернуть отметки по городам
