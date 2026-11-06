@@ -45,8 +45,8 @@ def city_rows(by_city, days, have):
     rows = []
     for name, c in by_city.items():
         fill = lambda a: [(v or 0) if d in have else None for v, d in zip(a, days)]
-        rows.append({'name': name, 'f': fill(c['f']), 'o': fill(c['o'])})
-    return sorted(rows, key=lambda r: (-sum(v or 0 for v in r['f']), r['name']))
+        rows.append({'name': name, 'f': fill(c['f']), 'o': fill(c['o']), 'ch': fill(c['ch']), 'che': fill(c['che'])})
+    return sorted(rows, key=lambda r: (-sum(v or 0 for v in r['f'] + r['ch']), r['name']))
 
 
 def build():
@@ -69,12 +69,17 @@ def build():
     # дни запрашиваем параллельно: в функции Vercel важна скорость ответа
     ds_api.reset_token()
     ds_api.token()
-    with ThreadPoolExecutor(8) as ex:
-        resp = dict(zip(have, ex.map(lambda d: ds_api.attendance(d, d, groupBy='city'), have)))
+    with ThreadPoolExecutor(12) as ex:
+        resp_f = ex.map(lambda d: ds_api.attendance(d, d, groupBy='city'), have)
+        resp_c = ex.map(lambda d: ds_api.checklists(d, d, groupBy='city'), have)
+        resp, cresp = dict(zip(have, resp_f)), dict(zip(have, resp_c))
     fact, ops = {}, {}
     cur, curp = {}, {}                  # админы компании (кураторы): отметки и люди по дням
     own = {}                            # отметки самого партнёра; None — партнёр не указан в настройках API
-    cities = {}                         # ключ партнёра -> город -> {'f': [...], 'o': [...]} по дням
+    chk, chke, chkd = {}, {}, {}        # чек-листы: начатые визиты, сотрудники, завершённые визиты по дням
+    cities = {}                         # ключ партнёра -> город -> {'f', 'o', 'ch', 'che'} по дням
+    new_city = lambda: {'f': [None] * len(days), 'o': [None] * len(days),
+                        'ch': [None] * len(days), 'che': [None] * len(days)}
     for i, d in enumerate(days):
         if d not in have:
             continue
@@ -92,10 +97,18 @@ def build():
             if p.get('partnerOwnShiftsCount') is not None:
                 own[k][i] = (own[k][i] or 0) + p['partnerOwnShiftsCount']
             for c in p.get('cities') or []:
-                cc = cities.setdefault(k, {}).setdefault(c['city'] or u'город не указан',
-                                                         {'f': [None] * len(days), 'o': [None] * len(days)})
+                cc = cities.setdefault(k, {}).setdefault(c['city'] or u'город не указан', new_city())
                 cc['f'][i] = (cc['f'][i] or 0) + c['shiftsCount']
                 cc['o'][i] = (cc['o'][i] or 0) + c['operatorsCheckedIn']
+        for p in cresp[d]['partners']:
+            k = resolve(p['partnerName'])
+            for a, f in ((chk, 'visitsStarted'), (chke, 'employeesStarted'), (chkd, 'visitsCompleted')):
+                a.setdefault(k, [None] * len(days))
+                a[k][i] = (a[k][i] or 0) + (p.get(f) or 0)
+            for c in p.get('cities') or []:
+                cc = cities.setdefault(k, {}).setdefault(c['city'] or u'город не указан', new_city())
+                cc['ch'][i] = (cc['ch'][i] or 0) + (c.get('visitsStarted') or 0)
+                cc['che'][i] = (cc['che'][i] or 0) + (c.get('employeesStarted') or 0)
     for k in fact:
         for i, d in enumerate(days):
             if d in have and fact[k][i] is None:
@@ -116,14 +129,18 @@ def build():
                     'cur': cur.get(k) or [0 if d in have else None for d in days],
                     'curp': curp.get(k) or [0 if d in have else None for d in days],
                     'own': own.get(k) or [None] * len(days),
+                    'ch': [(v or 0) if d in have else None for v, d in zip(chk.get(k) or [None] * len(days), days)],
+                    'che': [(v or 0) if d in have else None for v, d in zip(chke.get(k) or [None] * len(days), days)],
+                    'chd': [(v or 0) if d in have else None for v, d in zip(chkd.get(k) or [None] * len(days), days)],
                     'cities': city_rows(cities.get(k, {}), days, have),
-                    'zero': sum(v or 0 for v in f) == 0})
+                    'zero': sum(v or 0 for v in f) == 0 and sum(v or 0 for v in chk.get(k) or []) == 0})
     # партнёров, которых нет в плане (TazaLike, Айсултан, ИП Оспанова, «Блеск»), в отчёт не выводим
 
     tot = {'obj': sum(r['obj'] for r in out), 'plan_old': sum(r['plan_old'] for r in out),
            'plan': sum(r['plan'] or 0 for r in out),
            'plan80': sum(r['plan80'] or 0 for r in out),
-           'f': [(sum(r['f'][i] or 0 for r in out) if days[i] in have else None) for i in range(len(days))]}
+           'f': [(sum(r['f'][i] or 0 for r in out) if days[i] in have else None) for i in range(len(days))],
+           'ch': [(sum(r['ch'][i] or 0 for r in out) if days[i] in have else None) for i in range(len(days))]}
 
     data = {'days': days,
             'wd': [WD[datetime.date(*map(int, d.split('-'))).weekday()] for d in days],

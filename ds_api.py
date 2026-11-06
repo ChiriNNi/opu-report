@@ -47,3 +47,14 @@ def attendance(frm, to, **extra):
         BASE + '/api/dream-square/v1/reports/attendance?' + urllib.parse.urlencode(q),
         headers={'Authorization': 'Bearer ' + token()})
     return json.loads(urllib.request.urlopen(r, timeout=90).read().decode())
+
+
+def checklists(frm, to, **extra):
+    """Визиты по чек-листам (начатые заказы) по партнёрам: visitsStarted, visitsCompleted, employeesStarted."""
+    q = dict(extra)
+    q['from'] = frm
+    q['to'] = to
+    r = urllib.request.Request(
+        BASE + '/api/dream-square/v1/reports/checklists?' + urllib.parse.urlencode(q),
+        headers={'Authorization': 'Bearer ' + token()})
+    return json.loads(urllib.request.urlopen(r, timeout=90).read().decode())
