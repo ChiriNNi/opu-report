@@ -45,7 +45,7 @@ def city_rows(by_city, days, have):
     rows = []
     for name, c in by_city.items():
         fill = lambda a: [(v or 0) if d in have else None for v, d in zip(a, days)]
-        rows.append({'name': name, 'f': fill(c['f']), 'o': fill(c['o']), 'ch': fill(c['ch']), 'che': fill(c['che'])})
+        rows.append({'name': name, 'f': fill(c['f']), 'o': fill(c['o']), 'ch': fill(c['ch']), 'che': fill(c['che']), 'chv': fill(c['chv'])})
     return sorted(rows, key=lambda r: (-sum(v or 0 for v in r['f'] + r['ch']), r['name']))
 
 
@@ -76,10 +76,12 @@ def build():
     fact, ops = {}, {}
     cur, curp = {}, {}                  # админы компании (кураторы): отметки и люди по дням
     own = {}                            # отметки самого партнёра; None — партнёр не указан в настройках API
-    chk, chke, chkd = {}, {}, {}        # чек-листы: начатые визиты, сотрудники, завершённые визиты по дням
-    cities = {}                         # ключ партнёра -> город -> {'f', 'o', 'ch', 'che'} по дням
+    # чек-листы: отметки «сотрудник + объект» (objectCheckIns, как у отметок ОПУ), сотрудники,
+    # завершённые визиты, визиты по заказам (visitsStarted — несколько заказов на одном объекте) по дням
+    chk, chke, chkd, chkv = {}, {}, {}, {}
+    cities = {}                         # ключ партнёра -> город -> {'f', 'o', 'ch', 'che', 'chv'} по дням
     new_city = lambda: {'f': [None] * len(days), 'o': [None] * len(days),
-                        'ch': [None] * len(days), 'che': [None] * len(days)}
+                        'ch': [None] * len(days), 'che': [None] * len(days), 'chv': [None] * len(days)}
     for i, d in enumerate(days):
         if d not in have:
             continue
@@ -102,12 +104,13 @@ def build():
                 cc['o'][i] = (cc['o'][i] or 0) + c['operatorsCheckedIn']
         for p in cresp[d]['partners']:
             k = resolve(p['partnerName'])
-            for a, f in ((chk, 'visitsStarted'), (chke, 'employeesStarted'), (chkd, 'visitsCompleted')):
+            for a, f in ((chk, 'objectCheckIns'), (chke, 'employeesStarted'), (chkd, 'visitsCompleted'), (chkv, 'visitsStarted')):
                 a.setdefault(k, [None] * len(days))
                 a[k][i] = (a[k][i] or 0) + (p.get(f) or 0)
             for c in p.get('cities') or []:
                 cc = cities.setdefault(k, {}).setdefault(c['city'] or u'город не указан', new_city())
-                cc['ch'][i] = (cc['ch'][i] or 0) + (c.get('visitsStarted') or 0)
+                cc['ch'][i] = (cc['ch'][i] or 0) + (c.get('objectCheckIns') or 0)
+                cc['chv'][i] = (cc['chv'][i] or 0) + (c.get('visitsStarted') or 0)
                 cc['che'][i] = (cc['che'][i] or 0) + (c.get('employeesStarted') or 0)
     for k in fact:
         for i, d in enumerate(days):
@@ -131,6 +134,7 @@ def build():
                     'own': own.get(k) or [None] * len(days),
                     'ch': [(v or 0) if d in have else None for v, d in zip(chk.get(k) or [None] * len(days), days)],
                     'che': [(v or 0) if d in have else None for v, d in zip(chke.get(k) or [None] * len(days), days)],
+                    'chv': [(v or 0) if d in have else None for v, d in zip(chkv.get(k) or [None] * len(days), days)],
                     'chd': [(v or 0) if d in have else None for v, d in zip(chkd.get(k) or [None] * len(days), days)],
                     'cities': city_rows(cities.get(k, {}), days, have),
                     'zero': sum(v or 0 for v in f) == 0 and sum(v or 0 for v in chk.get(k) or []) == 0})

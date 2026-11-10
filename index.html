@@ -155,7 +155,7 @@ th.lvl.ow{background:#5f7a8c} td.ow{background:#eef3f6;font-weight:600} td.ow.z{
   <div class="scroll"><table id="t"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
   <div class="legend">
     <span><i class="sw" style="background:var(--fact)"></i>факт отметок за день (наведи — сколько операторов)</span>
-    <span><i class="sw" style="background:#fff4e0"></i>чек-листы — начатые визиты по заказам (наведи — сотрудники и завершённые); в отметки не входят</span>
+    <span><i class="sw" style="background:#fff4e0"></i>чек-листы — работа по заказам: сотрудник на объекте за день = 1, сколько бы заказов там ни было (наведи — сотрудники, заказы, завершённые); в отметки не входят</span>
     <span><i class="sw" style="background:var(--bad)"></i>ни одной отметки и ни одного чек-листа за выбранный период</span>
     <span>зелёным — факт за день (или в среднем за период) ≥ плана 80%</span>
     <span>▸ нажми на партнёра — отметки по городам</span>
@@ -254,7 +254,7 @@ function kpis(){
     ['План ОПУ', nf(D.tot.plan), 'операторов за ' + my(D.plan_month)],
     ['План 80%', nf(D.tot.plan80), 'целевой уровень'],
     ['Факт на ' + dmy(D.days[lastIdx]), nf(factLast), (D.tot.plan80 ? (factLast/D.tot.plan80*100).toFixed(1) : 0) + '% от плана 80%'],
-    ['Чек-листы на ' + dmy(D.days[lastIdx]), nf((D.tot.ch || [])[lastIdx] || 0), 'начатых визитов по заказам'],
+    ['Чек-листы на ' + dmy(D.days[lastIdx]), nf((D.tot.ch || [])[lastIdx] || 0), 'сотрудник + объект за день'],
     ['Объектов', nf(D.tot.obj), D.rows.length + ' партнёров'],
     ['Партнёров без отметок', D.rows.filter(r => r.zero).length, 'за весь период'],
   ].map(([l,v,n]) => '<div class="kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="n">'+n+'</div></div>').join('');
@@ -301,16 +301,17 @@ function render(){
     '<tr>' + idx.map(() => '<th class="lvl f">Отметки</th><th class="lvl ck">Чек-листы</th>').join('') +
     '<th class="lvl sum">Отметки</th><th class="lvl sum">В среднем/день</th><th class="lvl sum ck">Чек-листы</th></tr>';
 
-  // ячейка чек-листов: начатые визиты по заказам; подсказка — сотрудники и завершённые
-  const ckCell = (v, e, d) => v === null || v === undefined ? '<td class="ck na">·</td>'
-    : '<td class="ck' + (v ? '' : ' z') + '" title="сотрудников: ' + (e || 0) + (d === undefined ? '' : ' · завершено: ' + (d || 0)) + '">' + v + '</td>';
+  // ячейка чек-листов: отметки «сотрудник + объект» за день (как у отметок ОПУ);
+  // подсказка — сотрудники, заказы (несколько на одном объекте) и завершённые
+  const ckCell = (v, e, w, d) => v === null || v === undefined ? '<td class="ck na">·</td>'
+    : '<td class="ck' + (v ? '' : ' z') + '" title="сотрудников: ' + (e || 0) + ' · заказов: ' + (w || 0) + (d === undefined ? '' : ' · завершено: ' + (d || 0)) + '">' + v + '</td>';
   // города партнёра — по убыванию отметок и чек-листов за выбранный период
   const cityRows = r => !opened.has(r.name) ? '' : (r.cities || [])
     .map(c => ({c, s: idx.reduce((a,i)=>a+(c.f[i]||0),0), k: idx.reduce((a,i)=>a+(at(c.ch,i)||0),0)}))
     .sort((x,y) => y.s + y.k - x.s - x.k).map(({c, s, k}) => {
     return '<tr class="city"><td class="nm">' + c.name + '</td><td></td><td></td><td></td>' +
       idx.map(i => (c.f[i] === null ? '<td class="f d0 na">·</td>'
-        : '<td class="f d0" title="операторов: ' + (c.o[i] || 0) + '">' + c.f[i] + '</td>') + ckCell(at(c.ch,i), at(c.che,i))).join('') +
+        : '<td class="f d0" title="операторов: ' + (c.o[i] || 0) + '">' + c.f[i] + '</td>') + ckCell(at(c.ch,i), at(c.che,i), at(c.chv,i))).join('') +
       '<td class="sum">' + nf(s) + '</td><td class="sum">' + nf(Math.round(s/n)) + '</td><td class="sum ck">' + nf(k) + '</td></tr>';
   }).join('');
   document.querySelector('#t tbody').innerHTML = rs.map(r =>
@@ -322,7 +323,7 @@ function render(){
       const f = r.f[i];
       const cls = (f === null) ? 'f d0 na' : 'f d0 ' + (r.plan80 && f >= r.plan80 ? 'over' : (f ? '' : 'under'));
       const tip = (f === null) ? '' : ' title="операторов: ' + (r.o[i] || 0) + '"';
-      return '<td class="' + cls + '"' + tip + '>' + (f === null ? '·' : (f || 0)) + '</td>' + ckCell(at(r.ch,i), at(r.che,i), at(r.chd,i));
+      return '<td class="' + cls + '"' + tip + '>' + (f === null ? '·' : (f || 0)) + '</td>' + ckCell(at(r.ch,i), at(r.che,i), at(r.chv,i), at(r.chd,i));
     }).join('') + (s => '<td class="sum">' + nf(s) + '</td><td class="sum ' + avgCls(s/n, r.plan80) + '">' + nf(Math.round(s/n)) + '</td>')(sum(r)) +
     '<td class="sum ck">' + nf(csum(r)) + '</td></tr>' + cityRows(r)).join('');
 
@@ -334,7 +335,7 @@ function render(){
       const p80 = rs.reduce((a,r)=>a+(r.plan80||0),0);
       const f = past(D.days[i]) ? rs.reduce((a,r)=>a+(r.f[i]||0),0) : null;
       return '<td class="d0 ' + (f===null?'na':(p80&&f>=p80?'over':'under')) + '">' + (f===null?'·':f) + '</td>' +
-        ckCell(rs.reduce((a,r)=>a+(at(r.ch,i)||0),0), rs.reduce((a,r)=>a+(at(r.che,i)||0),0), rs.reduce((a,r)=>a+(at(r.chd,i)||0),0));
+        ckCell(rs.reduce((a,r)=>a+(at(r.ch,i)||0),0), rs.reduce((a,r)=>a+(at(r.che,i)||0),0), rs.reduce((a,r)=>a+(at(r.chv,i)||0),0), rs.reduce((a,r)=>a+(at(r.chd,i)||0),0));
     }).join('') + (() => {
       const s = rs.reduce((a,r)=>a+sum(r),0), p80 = rs.reduce((a,r)=>a+(r.plan80||0),0);
       return '<td class="sum">' + nf(s) + '</td><td class="sum ' + avgCls(s/n, p80) + '">' + nf(Math.round(s/n)) + '</td>' +

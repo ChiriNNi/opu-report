@@ -50,7 +50,7 @@ def attendance(frm, to, **extra):
 
 
 def checklists(frm, to, **extra):
-    """Визиты по чек-листам (начатые заказы) по партнёрам: visitsStarted, visitsCompleted, employeesStarted."""
+    """Работа по чек-листам (заказам) по партнёрам: objectCheckIns (сотрудник + объект + день), visitsStarted, visitsCompleted, employeesStarted."""
     q = dict(extra)
     q['from'] = frm
     q['to'] = to
