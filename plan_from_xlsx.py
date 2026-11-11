@@ -40,6 +40,11 @@ MATCH = {
     # Исмагамбетов М — в выгрузке нет, план не задан
 }
 
+# переводы операторов между партнёрами после выгрузки: (откуда, куда, сколько человек, дата)
+TRANSFERS = [
+    (u'Роза Ерасылова', u'Аубакирова А.', 52, '2026-11-11'),
+]
+
 src = sys.argv[1]
 ws = openpyxl.load_workbook(src, read_only=True, data_only=True).worksheets[0]
 rows = [r for r in list(ws.iter_rows(values_only=True))[1:] if r[0] and r[2]]
@@ -57,8 +62,14 @@ for name in report:
     if plan[name] is None:
         print(u'нет плана: %s' % name)
 
+for frm, to, n, when in TRANSFERS:
+    plan[frm] -= n
+    plan[to] += n
+    print(u'перевод %s: %s -> %s, %d чел.' % (when, frm, to, n))
+
 io.open('plan_opu.json', 'w', encoding='utf-8').write(json.dumps(
-    {'source': os.path.basename(src), 'month': month.strftime('%Y-%m'), 'plan': plan},
+    {'source': os.path.basename(src), 'month': month.strftime('%Y-%m'), 'plan': plan,
+     'transfers': [{'from': f, 'to': t, 'n': n, 'date': w} for f, t, n, w in TRANSFERS]},
     ensure_ascii=False, indent=1))
 print(u'plan_opu.json: месяц %s, партнёров %d, людей %d'
       % (month.strftime('%m.%Y'), len(plan), sum(v or 0 for v in plan.values())))
